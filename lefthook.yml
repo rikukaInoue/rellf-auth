@@ -1,0 +1,6 @@
+pre-commit:
+  commands:
+    swagger:
+      glob: "internal/handler/*.go,cmd/lambda/main.go"
+      run: |
+        swag init -g cmd/lambda/main.go -o docs --parseDependency --parseInternal --quiet && git add docs/

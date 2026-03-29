@@ -1,0 +1,396 @@
+basePath: /
+definitions:
+  internal_handler.AuthTokensResponse:
+    properties:
+      access_token:
+        example: eyJraWQ...
+        type: string
+      expires_in:
+        example: 3600
+        type: integer
+      id_token:
+        example: eyJraWQ...
+        type: string
+      refresh_token:
+        example: eyJjdH...
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  internal_handler.ConfirmForgotPasswordRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - code
+    - email
+    - new_password
+    type: object
+  internal_handler.ConfirmSignUpRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    required:
+    - code
+    - email
+    type: object
+  internal_handler.ErrorResponse:
+    properties:
+      detail:
+        type: string
+      message:
+        type: string
+    type: object
+  internal_handler.ForgotPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  internal_handler.LinkedProviderResponse:
+    properties:
+      provider_name:
+        example: Google
+        type: string
+      provider_uid:
+        example: "123456789"
+        type: string
+    type: object
+  internal_handler.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handler.ProvidersResponse:
+    properties:
+      providers:
+        items:
+          $ref: '#/definitions/internal_handler.LinkedProviderResponse'
+        type: array
+    type: object
+  internal_handler.SignUpRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_handler.SignUpResponse:
+    properties:
+      user_confirmed:
+        example: false
+        type: boolean
+      user_sub:
+        example: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+        type: string
+    type: object
+host: localhost
+info:
+  contact: {}
+  description: Authentication API with Cognito, email/password and Google OAuth
+  title: rellf-auth API
+  version: "1.0"
+paths:
+  /api/link/{provider}:
+    delete:
+      description: 認証済みユーザーから指定されたログインプロバイダの紐づけを解除
+      parameters:
+      - description: 'プロバイダ名 (例: google)'
+        in: path
+        name: provider
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: プロバイダのリンク解除
+      tags:
+      - account-link
+  /api/link/google:
+    get:
+      description: 認証済みユーザーのアカウントにGoogleログインを紐づける。Google OAuth認証ページにリダイレクト。
+      responses:
+        "302":
+          description: Google認証ページにリダイレクト
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Googleアカウントをリンク
+      tags:
+      - account-link
+  /api/me:
+    get:
+      description: 認証済みユーザーの情報を返す
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: ユーザー情報取得
+      tags:
+      - user
+  /api/providers:
+    get:
+      description: 認証済みユーザーに紐づけられているログインプロバイダの一覧を取得
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.ProvidersResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: リンク済みプロバイダ一覧
+      tags:
+      - account-link
+  /auth/confirm-forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: 確認コードと新しいパスワードでパスワードをリセット
+      parameters:
+      - description: リセット情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.ConfirmForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: パスワードリセット確認
+      tags:
+      - auth
+  /auth/confirm-signup:
+    post:
+      consumes:
+      - application/json
+      description: サインアップ時に送信された確認コードでメールアドレスを検証
+      parameters:
+      - description: 確認情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.ConfirmSignUpRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: メール確認
+      tags:
+      - auth
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: パスワードリセット用の確認コードをメールで送信
+      parameters:
+      - description: メールアドレス
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: パスワードリセット要求
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: メールアドレスとパスワードでログインし、JWTトークンを取得
+      parameters:
+      - description: ログイン情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.AuthTokensResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: ログイン
+      tags:
+      - auth
+  /auth/oauth/callback:
+    get:
+      description: Google OAuth認証後のコールバック。認可コードをトークンに交換する。stateが"link:"で始まる場合はアカウントリンクフローに分岐。
+      parameters:
+      - description: 認可コード
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: ステートパラメータ
+        in: query
+        name: state
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: OAuthコールバック
+      tags:
+      - oauth
+  /auth/oauth/google:
+    get:
+      description: Google OAuthログインページにリダイレクト
+      responses:
+        "302":
+          description: Google認証ページにリダイレクト
+      summary: Googleログイン
+      tags:
+      - oauth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: メールアドレスとパスワードで新規ユーザーを登録。登録後に確認コードがメールで送信される。
+      parameters:
+      - description: 登録情報
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.SignUpRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/internal_handler.SignUpResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.ErrorResponse'
+      summary: ユーザー登録
+      tags:
+      - auth
+  /health:
+    get:
+      description: サーバーの稼働状態を確認
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: ヘルスチェック
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: Enter "Bearer {token}"
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
