@@ -54,9 +54,7 @@ docs/                     # Swagger 自動生成ドキュメント
 | GET | `/api/link/google` | Google アカウントリンク |
 | DELETE | `/api/link/:provider` | プロバイダリンク解除 |
 
-API ドキュメント: https://rikukaInoue.github.io/rellf-auth/
-
-ローカル: `http://localhost:8080/swagger/index.html`
+Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ## ローカル開発
 
