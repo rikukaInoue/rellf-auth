@@ -15,7 +15,7 @@ resource "aws_lambda_function" "main" {
       AWS_REGION_NAME        = var.aws_region
       COGNITO_POOL_ID        = aws_cognito_user_pool.main.id
       COGNITO_CLIENT_ID      = aws_cognito_user_pool_client.main.id
-      COGNITO_CLIENT_SECRET  = aws_cognito_user_pool_client.main.client_secret
+      COGNITO_CLIENT_SECRET  = "ssm:/${var.project_name}/cognito-client-secret"
       COGNITO_DOMAIN         = "${var.cognito_domain_prefix}.auth.${var.aws_region}.amazoncognito.com"
       OAUTH_CALLBACK_URL     = "${aws_apigatewayv2_stage.main.invoke_url}/auth/oauth/callback"
     }

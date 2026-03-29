@@ -32,9 +32,14 @@ func main() {
 		log.Fatalf("failed to create cognito client: %v", err)
 	}
 
-	jwtMw, err := middleware.NewJWTMiddleware(cfg.AWSRegion, cfg.CognitoPoolID, cfg.CognitoClientID)
-	if err != nil {
-		log.Fatalf("failed to create JWT middleware: %v", err)
+	var jwtMw *middleware.JWTMiddleware
+	if cfg.IsLocal() {
+		jwtMw = middleware.NewLocalJWTMiddleware(cfg.CognitoClientID)
+	} else {
+		jwtMw, err = middleware.NewJWTMiddleware(cfg.AWSRegion, cfg.CognitoPoolID, cfg.CognitoClientID)
+		if err != nil {
+			log.Fatalf("failed to create JWT middleware: %v", err)
+		}
 	}
 
 	h := handler.New(cognitoClient, cfg)

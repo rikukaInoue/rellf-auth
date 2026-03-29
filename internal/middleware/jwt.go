@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -16,6 +17,7 @@ type JWTMiddleware struct {
 	issuer   string
 	clientID string
 	cache    *jwk.Cache
+	local    bool
 }
 
 func NewJWTMiddleware(region, poolID, clientID string) (*JWTMiddleware, error) {
@@ -41,6 +43,16 @@ func NewJWTMiddleware(region, poolID, clientID string) (*JWTMiddleware, error) {
 	}, nil
 }
 
+// NewLocalJWTMiddleware creates a JWT middleware for local development (floci/LocalStack).
+// It parses tokens without signature verification since local emulators may not provide valid JWKS.
+func NewLocalJWTMiddleware(clientID string) *JWTMiddleware {
+	log.Println("WARNING: JWT middleware running in local mode - signature verification disabled")
+	return &JWTMiddleware{
+		clientID: clientID,
+		local:    true,
+	}
+}
+
 func (m *JWTMiddleware) Verify() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -57,11 +69,23 @@ func (m *JWTMiddleware) Verify() gin.HandlerFunc {
 
 		tokenString := parts[1]
 
-		token, err := jwt.Parse([]byte(tokenString),
-			jwt.WithKeySet(m.keySet),
-			jwt.WithValidate(true),
-			jwt.WithIssuer(m.issuer),
-		)
+		var token jwt.Token
+		var err error
+
+		if m.local {
+			// Local mode: parse without signature verification
+			token, err = jwt.Parse([]byte(tokenString),
+				jwt.WithVerify(false),
+				jwt.WithValidate(true),
+			)
+		} else {
+			token, err = jwt.Parse([]byte(tokenString),
+				jwt.WithKeySet(m.keySet),
+				jwt.WithValidate(true),
+				jwt.WithIssuer(m.issuer),
+			)
+		}
+
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "invalid token", "detail": err.Error()})
 			return

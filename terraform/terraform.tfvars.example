@@ -3,7 +3,7 @@ project_name          = "rellf-auth"
 cognito_domain_prefix = "rellf-auth"
 
 google_client_id     = "YOUR_GOOGLE_CLIENT_ID"
-google_client_secret = "YOUR_GOOGLE_CLIENT_SECRET"
+google_client_secret = "YOUR_GOOGLE_CLIENT_SECRET"  # Stored in SSM, only needed for initial setup
 
-oauth_callback_urls = ["http://localhost:3000/auth/oauth/callback"]
-oauth_logout_urls   = ["http://localhost:3000"]
+oauth_callback_urls = ["http://localhost:8080/auth/oauth/callback"]
+oauth_logout_urls   = ["http://localhost:8080"]

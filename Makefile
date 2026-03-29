@@ -1,4 +1,4 @@
-.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev
+.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev dev-local floci-up floci-setup test
 
 build: build-api build-presignup
 
@@ -29,3 +29,17 @@ swagger:
 
 dev:
 	set -a && . ./.env && set +a && go run cmd/server/main.go
+
+dev-local:
+	set -a && . ./.env.local && set +a && go run cmd/server/main.go
+
+floci-up:
+	docker compose up -d
+
+floci-setup: floci-up
+	@echo "Waiting for floci to be ready..."
+	@sleep 3
+	bash scripts/setup-local.sh
+
+test: floci-setup
+	set -a && . ./.env.local && set +a && go test -tags integration -v -count=1 ./...
