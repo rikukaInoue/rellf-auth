@@ -32,6 +32,16 @@ data "aws_iam_policy_document" "cognito_access" {
     ]
     resources = [aws_cognito_user_pool.main.arn]
   }
+
+  statement {
+    actions = [
+      "ssm:GetParameters",
+      "ssm:GetParameter",
+    ]
+    resources = [
+      "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*",
+    ]
+  }
 }
 
 resource "aws_iam_policy" "cognito_access" {
