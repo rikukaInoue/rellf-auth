@@ -59,8 +59,15 @@ func New(cfg *config.Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	opts := []func(*cip.Options){}
+	if cfg.AWSEndpointURL != "" {
+		opts = append(opts, func(o *cip.Options) {
+			o.BaseEndpoint = aws.String(cfg.AWSEndpointURL)
+		})
+	}
+
 	return &Client{
-		cip:          cip.NewFromConfig(awsCfg),
+		cip:          cip.NewFromConfig(awsCfg, opts...),
 		poolID:       cfg.CognitoPoolID,
 		clientID:     cfg.CognitoClientID,
 		clientSecret: cfg.CognitoClientSecret,
