@@ -1,4 +1,4 @@
-.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger
+.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev
 
 build: build-api build-presignup
 
@@ -26,3 +26,6 @@ vet:
 
 swagger:
 	swag init -g cmd/lambda/main.go -o docs --parseDependency --parseInternal
+
+dev:
+	set -a && . ./.env && set +a && go run cmd/server/main.go
