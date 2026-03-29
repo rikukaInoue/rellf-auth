@@ -56,6 +56,19 @@ docs/                     # Swagger 自動生成ドキュメント
 
 Swagger UI: `http://localhost:8080/swagger/index.html`
 
+### 管理画面 (`/admin`)
+
+| パス | 説明 |
+|------|------|
+| `/admin/login` | 管理者ログイン |
+| `/admin/users` | ユーザー一覧・検索 |
+| `/admin/users/new` | ユーザー作成 |
+| `/admin/users/:username` | ユーザー詳細・操作（確認・無効化・有効化・パスワードリセット・削除） |
+
+管理画面: `http://localhost:8080/admin/login`
+
+ローカル開発時の管理者: `admin@example.com` / `Admin1234!`
+
 ## ローカル開発
 
 ### 前提条件

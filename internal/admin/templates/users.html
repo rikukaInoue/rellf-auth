@@ -1,0 +1,58 @@
+{{define "title"}}Users{{end}}
+{{define "content"}}
+<div class="page-header">
+  <h1>Users</h1>
+  <a href="/admin/users/new" class="btn btn-primary">Create User</a>
+</div>
+
+<div class="card">
+  <form class="search-bar" method="GET" action="/admin/users">
+    <input type="text" name="search" placeholder="Search by email..." value="{{.Search}}">
+    <button type="submit" class="btn btn-outline">Search</button>
+    {{if .Search}}<a href="/admin/users" class="btn btn-outline">Clear</a>{{end}}
+  </form>
+
+  {{if .Users}}
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Enabled</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Users}}
+      <tr>
+        <td><a href="/admin/users/{{.Username}}">{{.Email}}</a></td>
+        <td>
+          {{if eq .Status "CONFIRMED"}}<span class="badge badge-green">{{.Status}}</span>
+          {{else if eq .Status "UNCONFIRMED"}}<span class="badge badge-yellow">{{.Status}}</span>
+          {{else if eq .Status "FORCE_CHANGE_PASSWORD"}}<span class="badge badge-yellow">{{.Status}}</span>
+          {{else if eq .Status "RESET_REQUIRED"}}<span class="badge badge-yellow">{{.Status}}</span>
+          {{else}}<span class="badge badge-gray">{{.Status}}</span>
+          {{end}}
+        </td>
+        <td>
+          {{if .Enabled}}<span class="badge badge-green">Yes</span>
+          {{else}}<span class="badge badge-red">No</span>
+          {{end}}
+        </td>
+        <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+
+  {{if .NextToken}}
+  <div class="mt-1">
+    <a href="/admin/users?next={{.NextToken}}{{if .Search}}&search={{.Search}}{{end}}" class="btn btn-outline">Next Page</a>
+  </div>
+  {{end}}
+
+  {{else}}
+  <p>No users found.</p>
+  {{end}}
+</div>
+{{end}}

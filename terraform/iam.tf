@@ -27,6 +27,12 @@ data "aws_iam_policy_document" "cognito_access" {
     actions = [
       "cognito-idp:ListUsers",
       "cognito-idp:AdminGetUser",
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminConfirmSignUp",
+      "cognito-idp:AdminResetUserPassword",
+      "cognito-idp:AdminDisableUser",
+      "cognito-idp:AdminEnableUser",
+      "cognito-idp:AdminDeleteUser",
       "cognito-idp:AdminLinkProviderForUser",
       "cognito-idp:AdminDisableProviderForUser",
     ]

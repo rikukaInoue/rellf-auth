@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/inouetaishi/rellf-auth/internal/admin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
@@ -34,7 +35,8 @@ func setupTestServer(t *testing.T) *httptest.Server {
 
 	jwtMw := middleware.NewLocalJWTMiddleware(cfg.CognitoClientID)
 	h := handler.New(cognitoClient, cfg)
-	r := router.Setup(h, jwtMw)
+	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
+	r := router.Setup(h, adminH, jwtMw)
 
 	return httptest.NewServer(r)
 }
