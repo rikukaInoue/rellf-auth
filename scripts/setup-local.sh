@@ -43,6 +43,38 @@ COGNITO_DOMAIN=localhost
 OAUTH_CALLBACK_URL=http://localhost:8080/auth/oauth/callback
 EOF
 
+echo "==> Creating admin group..."
+aws cognito-idp create-group \
+  --user-pool-id "$POOL_ID" \
+  --group-name admin \
+  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+
+echo "==> Creating admin user..."
+aws cognito-idp sign-up \
+  --client-id "$CLIENT_ID" \
+  --username admin@example.com \
+  --password "Admin1234!" \
+  --user-attributes Name=email,Value=admin@example.com \
+  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+
+aws cognito-idp admin-confirm-sign-up \
+  --user-pool-id "$POOL_ID" \
+  --username admin@example.com \
+  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || \
+aws cognito-idp confirm-sign-up \
+  --client-id "$CLIENT_ID" \
+  --username admin@example.com \
+  --confirmation-code 000000 \
+  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id "$POOL_ID" \
+  --username admin@example.com \
+  --group-name admin \
+  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+echo "    Admin: admin@example.com / Admin1234!"
+
 echo ""
 echo "==> Setup complete!"
 echo "    Run: make dev-local"
+echo "    Admin: http://localhost:8080/admin/login"

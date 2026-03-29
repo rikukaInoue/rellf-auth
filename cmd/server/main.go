@@ -12,6 +12,7 @@ package main
 import (
 	"log"
 
+	"github.com/inouetaishi/rellf-auth/internal/admin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
@@ -43,7 +44,8 @@ func main() {
 	}
 
 	h := handler.New(cognitoClient, cfg)
-	r := router.Setup(h, jwtMw)
+	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
+	r := router.Setup(h, adminH, jwtMw)
 
 	log.Println("Starting server on :8080")
 	if err := r.Run(":8080"); err != nil {

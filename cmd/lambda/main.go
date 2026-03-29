@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
+	"github.com/inouetaishi/rellf-auth/internal/admin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
@@ -44,7 +45,8 @@ func init() {
 	}
 
 	h := handler.New(cognitoClient, cfg)
-	r := router.Setup(h, jwtMw)
+	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
+	r := router.Setup(h, adminH, jwtMw)
 	ginLambda = ginadapter.NewV2(r)
 }
 

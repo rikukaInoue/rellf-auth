@@ -1,0 +1,74 @@
+{{define "title"}}{{.User.Email}}{{end}}
+{{define "content"}}
+<div class="page-header">
+  <h1>{{.User.Email}}</h1>
+  <a href="/admin/users" class="btn btn-outline">Back to list</a>
+</div>
+
+<div class="card">
+  <dl class="dl">
+    <dt>Username</dt>
+    <dd>{{.User.Username}}</dd>
+    <dt>Email</dt>
+    <dd>{{.User.Email}}</dd>
+    <dt>Status</dt>
+    <dd>
+      {{if eq .User.Status "CONFIRMED"}}<span class="badge badge-green">{{.User.Status}}</span>
+      {{else if eq .User.Status "UNCONFIRMED"}}<span class="badge badge-yellow">{{.User.Status}}</span>
+      {{else if eq .User.Status "FORCE_CHANGE_PASSWORD"}}<span class="badge badge-yellow">{{.User.Status}}</span>
+      {{else if eq .User.Status "RESET_REQUIRED"}}<span class="badge badge-yellow">{{.User.Status}}</span>
+      {{else}}<span class="badge badge-gray">{{.User.Status}}</span>
+      {{end}}
+    </dd>
+    <dt>Enabled</dt>
+    <dd>
+      {{if .User.Enabled}}<span class="badge badge-green">Yes</span>
+      {{else}}<span class="badge badge-red">No</span>
+      {{end}}
+    </dd>
+    <dt>Created</dt>
+    <dd>{{.User.CreatedAt.Format "2006-01-02 15:04:05"}}</dd>
+    <dt>Modified</dt>
+    <dd>{{.User.ModifiedAt.Format "2006-01-02 15:04:05"}}</dd>
+  </dl>
+
+  {{if .User.Attributes}}
+  <h3 class="mt-1">Attributes</h3>
+  <dl class="dl">
+    {{range $k, $v := .User.Attributes}}
+    <dt>{{$k}}</dt>
+    <dd>{{$v}}</dd>
+    {{end}}
+  </dl>
+  {{end}}
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Actions</h3>
+  <div class="actions">
+    {{if eq .User.Status "UNCONFIRMED"}}
+    <form method="POST" action="/admin/users/{{.User.Username}}/confirm">
+      <button type="submit" class="btn btn-success btn-sm">Confirm User</button>
+    </form>
+    {{end}}
+
+    <form method="POST" action="/admin/users/{{.User.Username}}/reset-password">
+      <button type="submit" class="btn btn-warning btn-sm">Reset Password</button>
+    </form>
+
+    {{if .User.Enabled}}
+    <form method="POST" action="/admin/users/{{.User.Username}}/disable">
+      <button type="submit" class="btn btn-warning btn-sm">Disable</button>
+    </form>
+    {{else}}
+    <form method="POST" action="/admin/users/{{.User.Username}}/enable">
+      <button type="submit" class="btn btn-success btn-sm">Enable</button>
+    </form>
+    {{end}}
+
+    <form method="POST" action="/admin/users/{{.User.Username}}/delete" onsubmit="return confirm('Are you sure you want to delete this user?')">
+      <button type="submit" class="btn btn-danger btn-sm">Delete User</button>
+    </form>
+  </div>
+</div>
+{{end}}

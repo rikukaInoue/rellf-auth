@@ -1,4 +1,4 @@
-.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev dev-local floci-up floci-setup test
+.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev dev-local floci-up floci-setup floci-restart local test
 
 build: build-api build-presignup
 
@@ -41,5 +41,11 @@ floci-setup: floci-up
 	@sleep 3
 	bash scripts/setup-local.sh
 
-test: floci-setup
+floci-restart:
+	docker compose down
+	$(MAKE) floci-setup
+
+local: floci-restart dev-local
+
+test: floci-restart
 	set -a && . ./.env.local && set +a && go test -tags integration -v -count=1 ./...
