@@ -19,6 +19,13 @@ type Config struct {
 	CognitoClientSecret string `envconfig:"COGNITO_CLIENT_SECRET" required:"true"`
 	CognitoDomain       string `envconfig:"COGNITO_DOMAIN" required:"true"`
 	OAuthCallbackURL    string `envconfig:"OAUTH_CALLBACK_URL" required:"true"`
+
+	// OIDC Provider settings
+	OIDCIssuer      string `envconfig:"OIDC_ISSUER" required:"true"`
+	OIDCSigningKey  string `envconfig:"OIDC_SIGNING_KEY" required:"true"`  // RSA PEM or "auto" for local
+	OIDCKeyID       string `envconfig:"OIDC_KEY_ID" required:"true"`
+	OIDCAuthCodeKey string `envconfig:"OIDC_AUTH_CODE_KEY" required:"true"` // AES-256 hex (64 chars)
+	OIDCClients     string `envconfig:"OIDC_CLIENTS" required:"true"`      // client definitions
 }
 
 // IsLocal returns true when running against a local emulator (floci/LocalStack).
@@ -45,6 +52,8 @@ func Load() (*Config, error) {
 func resolveSSMValues(cfg *Config) error {
 	fields := []*string{
 		&cfg.CognitoClientSecret,
+		&cfg.OIDCSigningKey,
+		&cfg.OIDCAuthCodeKey,
 	}
 
 	// Collect SSM paths

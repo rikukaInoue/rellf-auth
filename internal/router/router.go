@@ -9,13 +9,23 @@ import (
 	"github.com/inouetaishi/rellf-auth/internal/admin"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
+	"github.com/inouetaishi/rellf-auth/internal/oidc"
 )
 
-func Setup(h *handler.Handler, adminH *admin.AdminHandler, jwtMw *middleware.JWTMiddleware) *gin.Engine {
+func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandler, jwtMw *middleware.JWTMiddleware) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/health", h.HealthCheck)
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// OIDC Provider endpoints
+	r.GET("/.well-known/openid-configuration", oidcH.Discovery)
+	r.GET("/oidc/jwks.json", oidcH.JWKS)
+	r.GET("/oidc/authorize", oidcH.Authorize)
+	r.POST("/oidc/authorize", oidcH.AuthorizeSubmit)
+	r.POST("/oidc/token", oidcH.Token)
+	r.GET("/oidc/userinfo", oidcH.UserInfo)
+	r.StaticFS("/oidc/static", oidcH.StaticFS())
 
 	auth := r.Group("/auth")
 	{
