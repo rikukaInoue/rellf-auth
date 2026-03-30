@@ -49,3 +49,27 @@ variable "presignup_zip_path" {
   type        = string
   default     = "../presignup.zip"
 }
+
+# OIDC Provider
+
+variable "oidc_signing_key" {
+  description = "RSA private key (PEM) for signing OIDC tokens"
+  type        = string
+  sensitive   = true
+}
+
+variable "oidc_key_id" {
+  description = "Key ID (kid) for the OIDC signing key"
+  type        = string
+}
+
+variable "oidc_auth_code_key" {
+  description = "AES-256 key (hex) for encrypting authorization codes"
+  type        = string
+  sensitive   = true
+}
+
+variable "oidc_clients" {
+  description = "OIDC client definitions (format: client_id:secret:type:redirect_uris)"
+  type        = string
+}

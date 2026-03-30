@@ -41,6 +41,11 @@ COGNITO_CLIENT_ID=$CLIENT_ID
 COGNITO_CLIENT_SECRET=$CLIENT_SECRET
 COGNITO_DOMAIN=localhost
 OAUTH_CALLBACK_URL=http://localhost:8080/auth/oauth/callback
+OIDC_ISSUER=http://localhost:8080
+OIDC_SIGNING_KEY=auto
+OIDC_KEY_ID=local-key-1
+OIDC_AUTH_CODE_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+OIDC_CLIENTS=test-client::public:http://localhost:3000/callback
 EOF
 
 echo "==> Creating admin group..."

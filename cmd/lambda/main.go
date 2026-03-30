@@ -21,6 +21,7 @@ import (
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
+	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/router"
 
 	_ "github.com/inouetaishi/rellf-auth/docs"
@@ -44,9 +45,28 @@ func init() {
 		log.Fatalf("failed to create JWT middleware: %v", err)
 	}
 
+	// OIDC Provider setup
+	tokenIssuer, err := oidc.NewTokenIssuer(cfg.OIDCSigningKey, cfg.OIDCKeyID, cfg.OIDCIssuer)
+	if err != nil {
+		log.Fatalf("failed to create token issuer: %v", err)
+	}
+
+	authCodeCodec, err := oidc.NewAuthCodeCodec(cfg.OIDCAuthCodeKey)
+	if err != nil {
+		log.Fatalf("failed to create auth code codec: %v", err)
+	}
+
+	oidcClients, err := oidc.ParseClients(cfg.OIDCClients)
+	if err != nil {
+		log.Fatalf("failed to parse OIDC clients: %v", err)
+	}
+	clientRegistry := oidc.NewClientRegistry(oidcClients)
+
+	oidcH := oidc.NewOIDCHandler(cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
+
 	h := handler.New(cognitoClient, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
-	r := router.Setup(h, adminH, jwtMw)
+	r := router.Setup(h, adminH, oidcH, jwtMw)
 	ginLambda = ginadapter.NewV2(r)
 }
 

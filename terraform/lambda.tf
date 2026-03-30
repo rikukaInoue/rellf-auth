@@ -18,6 +18,11 @@ resource "aws_lambda_function" "main" {
       COGNITO_CLIENT_SECRET  = "ssm:/${var.project_name}/cognito-client-secret"
       COGNITO_DOMAIN         = "${var.cognito_domain_prefix}.auth.${var.aws_region}.amazoncognito.com"
       OAUTH_CALLBACK_URL     = "${aws_apigatewayv2_stage.main.invoke_url}/auth/oauth/callback"
+      OIDC_ISSUER            = aws_apigatewayv2_stage.main.invoke_url
+      OIDC_SIGNING_KEY       = "ssm:/${var.project_name}/oidc-signing-key"
+      OIDC_KEY_ID            = var.oidc_key_id
+      OIDC_AUTH_CODE_KEY     = "ssm:/${var.project_name}/oidc-auth-code-key"
+      OIDC_CLIENTS           = var.oidc_clients
     }
   }
 

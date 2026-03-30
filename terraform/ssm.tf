@@ -17,3 +17,23 @@ resource "aws_ssm_parameter" "google_client_secret" {
     Project = var.project_name
   }
 }
+
+resource "aws_ssm_parameter" "oidc_signing_key" {
+  name  = "/${var.project_name}/oidc-signing-key"
+  type  = "SecureString"
+  value = var.oidc_signing_key
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_ssm_parameter" "oidc_auth_code_key" {
+  name  = "/${var.project_name}/oidc-auth-code-key"
+  type  = "SecureString"
+  value = var.oidc_auth_code_key
+
+  tags = {
+    Project = var.project_name
+  }
+}
