@@ -22,3 +22,8 @@ output "lambda_function_name" {
   description = "Lambda function name"
   value       = aws_lambda_function.main.function_name
 }
+
+output "domain_url" {
+  description = "Custom domain URL"
+  value       = "https://${var.domain_name}"
+}
