@@ -7,22 +7,30 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/inouetaishi/rellf-auth/internal/admin"
+	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/handler"
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/pages"
 )
 
-func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandler, jwtMw *middleware.JWTMiddleware) *gin.Engine {
+func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandler, jwtMw *middleware.JWTMiddleware, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.SecurityHeaders())
 
+	// Public endpoints (no basic auth)
 	r.GET("/health", h.HealthCheck)
+	r.GET("/.well-known/openid-configuration", oidcH.Discovery)
+	r.GET("/oidc/jwks.json", oidcH.JWKS)
+
+	// Apply basic auth to all other routes when configured
+	if cfg.BasicAuthEnabled() {
+		r.Use(middleware.BasicAuth(cfg.BasicAuthUser, cfg.BasicAuthPass))
+	}
+
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// OIDC Provider endpoints
-	r.GET("/.well-known/openid-configuration", oidcH.Discovery)
-	r.GET("/oidc/jwks.json", oidcH.JWKS)
 	r.GET("/oidc/authorize", oidcH.Authorize)
 	r.POST("/oidc/authorize", oidcH.AuthorizeSubmit)
 	r.POST("/oidc/token", oidcH.Token)
