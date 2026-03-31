@@ -29,13 +29,19 @@ variable "google_client_secret" {
 variable "oauth_callback_urls" {
   description = "Allowed OAuth callback URLs"
   type        = list(string)
-  default     = ["http://localhost:3000/auth/oauth/callback"]
+  default     = [
+    "http://localhost:3000/auth/oauth/callback",
+    "https://auth.rikuka.dev/auth/oauth/callback",
+  ]
 }
 
 variable "oauth_logout_urls" {
   description = "Allowed logout URLs"
   type        = list(string)
-  default     = ["http://localhost:3000"]
+  default     = [
+    "http://localhost:3000",
+    "https://auth.rikuka.dev",
+  ]
 }
 
 variable "lambda_zip_path" {
@@ -72,4 +78,18 @@ variable "oidc_auth_code_key" {
 variable "oidc_clients" {
   description = "OIDC client definitions (format: client_id:secret:type:redirect_uris)"
   type        = string
+}
+
+# Domain
+
+variable "domain_name" {
+  description = "Custom domain name for the API (e.g. auth.rikuka.dev)"
+  type        = string
+  default     = "auth.rikuka.dev"
+}
+
+variable "domain_zone" {
+  description = "Route53 hosted zone name"
+  type        = string
+  default     = "rikuka.dev"
 }
