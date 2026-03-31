@@ -80,6 +80,12 @@ variable "oidc_clients" {
   type        = string
 }
 
+variable "cors_origins" {
+  description = "Comma-separated list of allowed CORS origins"
+  type        = string
+  default     = ""
+}
+
 # Basic Auth (provisional access control)
 
 variable "basic_auth_user" {

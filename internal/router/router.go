@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -17,6 +18,10 @@ import (
 func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandler, jwtMw *middleware.JWTMiddleware, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.Use(middleware.SecurityHeaders())
+	if cfg.CORSOrigins != "" {
+		origins := strings.Split(cfg.CORSOrigins, ",")
+		r.Use(middleware.CORS(origins))
+	}
 
 	// Public endpoints (no basic auth)
 	r.GET("/health", h.HealthCheck)
