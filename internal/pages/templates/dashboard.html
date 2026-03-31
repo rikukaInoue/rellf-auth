@@ -1,0 +1,128 @@
+{{define "dashboard"}}<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダッシュボード - rellf</title>
+  <link rel="stylesheet" href="/pages/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header-row">
+        <h1>マイページ</h1>
+        <button class="btn btn-outline btn-sm" id="logout-btn">ログアウト</button>
+      </div>
+      <div id="alert" class="alert alert-error"></div>
+      <div id="loading" class="loading">読み込み中...</div>
+
+      <div id="content" style="display:none">
+        <dl class="user-info">
+          <dt>メールアドレス</dt>
+          <dd id="user-email">-</dd>
+          <dt>ユーザーID</dt>
+          <dd id="user-sub" style="font-size:0.85rem;color:#666">-</dd>
+        </dl>
+
+        <h3 class="section-title">連携済みプロバイダ</h3>
+        <ul class="provider-list" id="provider-list"></ul>
+        <button class="btn btn-outline btn-sm" id="link-google-btn" style="margin-top:0.75rem">Googleを連携</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const token = sessionStorage.getItem('access_token');
+    const idToken = sessionStorage.getItem('id_token');
+    if (!token) {
+      window.location.href = '/pages/login';
+    }
+
+    const alert = document.getElementById('alert');
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+
+    function showError(msg) {
+      alert.textContent = msg;
+      alert.style.display = 'block';
+    }
+
+    function authHeaders() {
+      return { 'Authorization': 'Bearer ' + token };
+    }
+
+    async function loadDashboard() {
+      try {
+        const [meRes, provRes] = await Promise.all([
+          fetch('/api/me', { headers: authHeaders() }),
+          fetch('/api/providers', { headers: authHeaders() }),
+        ]);
+
+        if (meRes.status === 401) {
+          sessionStorage.clear();
+          window.location.href = '/pages/login';
+          return;
+        }
+
+        const me = await meRes.json();
+        const prov = await provRes.json();
+
+        document.getElementById('user-email').textContent = me.email || me.sub || '-';
+        document.getElementById('user-sub').textContent = me.sub || '-';
+
+        const list = document.getElementById('provider-list');
+        list.innerHTML = '';
+        if (prov.providers && prov.providers.length > 0) {
+          prov.providers.forEach((p) => {
+            const li = document.createElement('li');
+            li.innerHTML = '<span class="provider-name">' + p.provider_name + '</span>';
+            if (p.provider_name !== 'Cognito') {
+              const btn = document.createElement('button');
+              btn.className = 'btn btn-danger btn-sm';
+              btn.textContent = '解除';
+              btn.onclick = () => unlinkProvider(p.provider_name);
+              li.appendChild(btn);
+            }
+            list.appendChild(li);
+          });
+        } else {
+          list.innerHTML = '<li style="color:#888">連携済みプロバイダはありません</li>';
+        }
+
+        loading.style.display = 'none';
+        content.style.display = 'block';
+      } catch (err) {
+        loading.style.display = 'none';
+        showError('情報の取得に失敗しました');
+      }
+    }
+
+    async function unlinkProvider(name) {
+      if (!confirm(name + ' の連携を解除しますか？')) return;
+      try {
+        const res = await fetch('/api/link/' + name.toLowerCase(), {
+          method: 'DELETE',
+          headers: authHeaders(),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || '解除に失敗しました');
+        }
+        loadDashboard();
+      } catch (err) {
+        showError(err.message);
+      }
+    }
+
+    document.getElementById('link-google-btn').addEventListener('click', () => {
+      window.location.href = '/api/link/google';
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      sessionStorage.clear();
+      window.location.href = '/pages/login';
+    });
+
+    loadDashboard();
+  </script>
+</body>
+</html>{{end}}

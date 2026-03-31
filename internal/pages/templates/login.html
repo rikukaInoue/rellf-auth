@@ -1,0 +1,69 @@
+{{define "login"}}<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - rellf</title>
+  <link rel="stylesheet" href="/pages/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>rellf</h1>
+      <p class="subtitle">アカウントにログイン</p>
+      <div id="alert" class="alert alert-error"></div>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="email">メールアドレス</label>
+          <input type="email" id="email" name="email" required autofocus placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" name="password" required placeholder="パスワードを入力">
+        </div>
+        <button type="submit" class="btn" id="submit-btn">ログイン</button>
+      </form>
+      <div class="link">
+        <a href="/pages/signup">アカウントを作成</a>
+      </div>
+    </div>
+  </div>
+  <script>
+    const form = document.getElementById('login-form');
+    const alert = document.getElementById('alert');
+    const btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alert.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'ログイン中...';
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || 'ログインに失敗しました');
+        }
+        sessionStorage.setItem('access_token', data.access_token);
+        sessionStorage.setItem('id_token', data.id_token);
+        sessionStorage.setItem('refresh_token', data.refresh_token);
+        window.location.href = '/pages/dashboard';
+      } catch (err) {
+        alert.textContent = err.message;
+        alert.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ログイン';
+      }
+    });
+  </script>
+</body>
+</html>{{end}}
