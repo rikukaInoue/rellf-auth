@@ -50,7 +50,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.message || 'ログインに失敗しました');
+          throw new Error(data.detail || data.message || 'ログインに失敗しました');
         }
         sessionStorage.setItem('access_token', data.access_token);
         sessionStorage.setItem('id_token', data.id_token);

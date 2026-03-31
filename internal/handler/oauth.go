@@ -96,13 +96,23 @@ func (h *Handler) OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	var tokens map[string]interface{}
+	var tokens struct {
+		AccessToken  string `json:"access_token"`
+		IDToken      string `json:"id_token"`
+		RefreshToken string `json:"refresh_token"`
+	}
 	if err := json.Unmarshal(body, &tokens); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to parse token response", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, tokens)
+	// Redirect to dashboard with tokens as fragment (not sent to server)
+	redirect := fmt.Sprintf("/pages/dashboard#access_token=%s&id_token=%s&refresh_token=%s",
+		url.QueryEscape(tokens.AccessToken),
+		url.QueryEscape(tokens.IDToken),
+		url.QueryEscape(tokens.RefreshToken),
+	)
+	c.Redirect(http.StatusFound, redirect)
 }
 
 // Me godoc

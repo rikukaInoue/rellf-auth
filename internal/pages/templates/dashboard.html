@@ -31,6 +31,18 @@
     </div>
   </div>
   <script>
+    // Pick up tokens from URL fragment (after Google OAuth redirect)
+    if (window.location.hash) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const at = params.get('access_token');
+      const it = params.get('id_token');
+      const rt = params.get('refresh_token');
+      if (at) sessionStorage.setItem('access_token', at);
+      if (it) sessionStorage.setItem('id_token', it);
+      if (rt) sessionStorage.setItem('refresh_token', rt);
+      history.replaceState(null, '', '/pages/dashboard');
+    }
+
     const token = sessionStorage.getItem('access_token');
     const idToken = sessionStorage.getItem('id_token');
     if (!token) {
@@ -113,8 +125,18 @@
       }
     }
 
-    document.getElementById('link-google-btn').addEventListener('click', () => {
-      window.location.href = '/api/link/google';
+    document.getElementById('link-google-btn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/link/google', { headers: authHeaders() });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || 'Google連携に失敗しました');
+        }
+        const data = await res.json();
+        window.location.href = data.redirect_url;
+      } catch (err) {
+        showError(err.message);
+      }
     });
 
     document.getElementById('logout-btn').addEventListener('click', () => {

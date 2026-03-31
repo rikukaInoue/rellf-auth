@@ -35,7 +35,7 @@ func (h *Handler) LinkGoogle(c *gin.Context) {
 		url.QueryEscape(state),
 	)
 
-	c.Redirect(http.StatusFound, authURL)
+	c.JSON(http.StatusOK, gin.H{"redirect_url": authURL})
 }
 
 // handleLinkCallback handles the OAuth callback when linking a provider to an existing account.
@@ -96,10 +96,7 @@ func (h *Handler) handleLinkCallback(c *gin.Context, code, username string) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":  "google account linked successfully",
-		"provider": "Google",
-	})
+	c.Redirect(http.StatusFound, "/pages/dashboard")
 }
 
 // UnlinkProvider godoc
