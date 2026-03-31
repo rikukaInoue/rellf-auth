@@ -23,6 +23,7 @@ resource "aws_lambda_function" "main" {
       OIDC_KEY_ID            = var.oidc_key_id
       OIDC_AUTH_CODE_KEY     = "ssm:/${var.project_name}/oidc-auth-code-key"
       OIDC_CLIENTS           = var.oidc_clients
+      CORS_ORIGINS           = var.cors_origins
       BASIC_AUTH_USER        = var.basic_auth_user
       BASIC_AUTH_PASS        = var.basic_auth_pass
     }
