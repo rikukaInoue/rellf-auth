@@ -10,10 +10,12 @@ import (
 	"github.com/inouetaishi/rellf-auth/internal/handler"
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
+	"github.com/inouetaishi/rellf-auth/internal/pages"
 )
 
 func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandler, jwtMw *middleware.JWTMiddleware) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.SecurityHeaders())
 
 	r.GET("/health", h.HealthCheck)
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -48,6 +50,13 @@ func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandl
 		protected.GET("/link/google", h.LinkGoogle)
 		protected.DELETE("/link/:provider", h.UnlinkProvider)
 	}
+
+	// User pages (provisional)
+	pagesH := pages.NewPagesHandler()
+	r.GET("/pages/login", pagesH.LoginPage)
+	r.GET("/pages/signup", pagesH.SignupPage)
+	r.GET("/pages/dashboard", pagesH.DashboardPage)
+	r.StaticFS("/pages/static", http.FS(pagesH.StaticFS()))
 
 	// Admin panel
 	r.GET("/admin/login", adminH.LoginPage)

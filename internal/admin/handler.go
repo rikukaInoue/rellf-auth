@@ -48,12 +48,16 @@ func (h *AdminHandler) LoginSubmit(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("admin_token", tokens.IDToken, 3600, "/admin", "", false, true)
+	secure := !h.cfg.IsLocal()
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("admin_token", tokens.IDToken, 3600, "/admin", "", secure, true)
 	c.Redirect(http.StatusSeeOther, "/admin/users")
 }
 
 func (h *AdminHandler) Logout(c *gin.Context) {
-	c.SetCookie("admin_token", "", -1, "/admin", "", false, true)
+	secure := !h.cfg.IsLocal()
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("admin_token", "", -1, "/admin", "", secure, true)
 	c.Redirect(http.StatusSeeOther, "/admin/login")
 }
 
@@ -188,8 +192,10 @@ func (h *AdminHandler) render(c *gin.Context, name string, data gin.H) {
 		if flashType, err := c.Cookie("flash_type"); err == nil {
 			data["FlashType"] = flashType
 		}
-		c.SetCookie("flash_msg", "", -1, "/admin", "", false, false)
-		c.SetCookie("flash_type", "", -1, "/admin", "", false, false)
+		secure := !h.cfg.IsLocal()
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie("flash_msg", "", -1, "/admin", "", secure, false)
+		c.SetCookie("flash_type", "", -1, "/admin", "", secure, false)
 	}
 
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -204,6 +210,8 @@ func (h *AdminHandler) renderError(c *gin.Context, msg string) {
 }
 
 func (h *AdminHandler) setFlash(c *gin.Context, flashType, msg string) {
-	c.SetCookie("flash_msg", msg, 10, "/admin", "", false, false)
-	c.SetCookie("flash_type", flashType, 10, "/admin", "", false, false)
+	secure := !h.cfg.IsLocal()
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("flash_msg", msg, 10, "/admin", "", secure, false)
+	c.SetCookie("flash_type", flashType, 10, "/admin", "", secure, false)
 }

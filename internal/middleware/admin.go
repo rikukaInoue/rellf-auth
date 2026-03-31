@@ -34,7 +34,9 @@ func (m *JWTMiddleware) VerifyAdminCookie() gin.HandlerFunc {
 		}
 
 		if err != nil {
-			c.SetCookie("admin_token", "", -1, "/admin", "", false, true)
+			secure := !m.local
+			c.SetSameSite(http.SameSiteLaxMode)
+			c.SetCookie("admin_token", "", -1, "/admin", "", secure, true)
 			c.Redirect(http.StatusFound, "/admin/login")
 			c.Abort()
 			return

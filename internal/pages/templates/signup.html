@@ -1,0 +1,121 @@
+{{define "signup"}}<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アカウント作成 - rellf</title>
+  <link rel="stylesheet" href="/pages/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>rellf</h1>
+      <p class="subtitle">新規アカウント作成</p>
+      <div id="alert" class="alert alert-error"></div>
+      <div id="success" class="alert alert-success"></div>
+      <form id="signup-form">
+        <div class="form-group">
+          <label for="email">メールアドレス</label>
+          <input type="email" id="email" name="email" required autofocus placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" name="password" required minlength="8" placeholder="8文字以上（大小英数字+記号）">
+        </div>
+        <button type="submit" class="btn" id="submit-btn">アカウントを作成</button>
+      </form>
+
+      <div id="confirm-section">
+        <p class="subtitle">確認コードがメールに送信されました</p>
+        <form id="confirm-form">
+          <div class="form-group">
+            <label for="code">確認コード</label>
+            <input type="text" id="code" name="code" required placeholder="123456" autocomplete="one-time-code">
+          </div>
+          <button type="submit" class="btn" id="confirm-btn">確認</button>
+        </form>
+      </div>
+
+      <div class="link">
+        <a href="/pages/login">ログインはこちら</a>
+      </div>
+    </div>
+  </div>
+  <script>
+    const signupForm = document.getElementById('signup-form');
+    const confirmForm = document.getElementById('confirm-form');
+    const confirmSection = document.getElementById('confirm-section');
+    const alert = document.getElementById('alert');
+    const success = document.getElementById('success');
+    let signupEmail = '';
+
+    function showError(msg) {
+      alert.textContent = msg;
+      alert.style.display = 'block';
+      success.style.display = 'none';
+    }
+    function showSuccess(msg) {
+      success.textContent = msg;
+      success.style.display = 'block';
+      alert.style.display = 'none';
+    }
+
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alert.style.display = 'none';
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+
+      try {
+        signupEmail = document.getElementById('email').value;
+        const res = await fetch('/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: signupEmail,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || '登録に失敗しました');
+        }
+        signupForm.style.display = 'none';
+        confirmSection.style.display = 'block';
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    confirmForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('confirm-btn');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/auth/confirm-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: signupEmail,
+            code: document.getElementById('code').value,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.message || '確認に失敗しました');
+        }
+        showSuccess('アカウントが確認されました。ログインしてください。');
+        confirmSection.style.display = 'none';
+        setTimeout(() => { window.location.href = '/pages/login'; }, 1500);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>{{end}}
