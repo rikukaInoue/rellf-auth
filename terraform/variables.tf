@@ -80,6 +80,21 @@ variable "oidc_clients" {
   type        = string
 }
 
+# Basic Auth (provisional access control)
+
+variable "basic_auth_user" {
+  description = "Basic auth username (leave empty to disable)"
+  type        = string
+  default     = ""
+}
+
+variable "basic_auth_pass" {
+  description = "Basic auth password"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # Domain
 
 variable "domain_name" {

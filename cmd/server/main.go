@@ -74,7 +74,7 @@ func main() {
 
 	h := handler.New(cognitoClient, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
-	r := router.Setup(h, adminH, oidcH, jwtMw)
+	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 
 	log.Println("Starting server on :8080")
 	if err := r.Run(":8080"); err != nil {

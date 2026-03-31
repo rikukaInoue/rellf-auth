@@ -26,6 +26,15 @@ type Config struct {
 	OIDCKeyID       string `envconfig:"OIDC_KEY_ID" required:"true"`
 	OIDCAuthCodeKey string `envconfig:"OIDC_AUTH_CODE_KEY" required:"true"` // AES-256 hex (64 chars)
 	OIDCClients     string `envconfig:"OIDC_CLIENTS" required:"true"`      // client definitions
+
+	// Basic Auth (optional, for provisional access control)
+	BasicAuthUser string `envconfig:"BASIC_AUTH_USER"`
+	BasicAuthPass string `envconfig:"BASIC_AUTH_PASS"`
+}
+
+// BasicAuthEnabled returns true when basic auth credentials are configured.
+func (c *Config) BasicAuthEnabled() bool {
+	return c.BasicAuthUser != "" && c.BasicAuthPass != ""
 }
 
 // IsLocal returns true when running against a local emulator (floci/LocalStack).

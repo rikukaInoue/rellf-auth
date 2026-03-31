@@ -56,7 +56,7 @@ func setupOIDCTestServer(t *testing.T) *httptest.Server {
 
 	h := handler.New(cognitoClient, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
-	r := router.Setup(h, adminH, oidcH, jwtMw)
+	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 
 	return httptest.NewServer(r)
 }
