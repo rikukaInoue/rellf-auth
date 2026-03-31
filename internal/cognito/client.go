@@ -182,6 +182,7 @@ func (c *Client) UnlinkProvider(ctx context.Context, username, providerName, pro
 		UserPoolId: aws.String(c.poolID),
 		User: &types.ProviderUserIdentifierType{
 			ProviderName:           aws.String(providerName),
+			ProviderAttributeName:  aws.String("Cognito_Subject"),
 			ProviderAttributeValue: aws.String(providerUID),
 		},
 	}

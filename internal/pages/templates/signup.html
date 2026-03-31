@@ -78,7 +78,7 @@
         });
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.message || '登録に失敗しました');
+          throw new Error(data.detail || data.message || '登録に失敗しました');
         }
         signupForm.style.display = 'none';
         confirmSection.style.display = 'block';

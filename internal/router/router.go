@@ -23,20 +23,14 @@ func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandl
 	r.GET("/.well-known/openid-configuration", oidcH.Discovery)
 	r.GET("/oidc/jwks.json", oidcH.JWKS)
 
-	// Apply basic auth to all other routes when configured
-	if cfg.BasicAuthEnabled() {
-		r.Use(middleware.BasicAuth(cfg.BasicAuthUser, cfg.BasicAuthPass))
-	}
-
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// OIDC Provider endpoints
+	// OIDC Provider endpoints (no basic auth — used by external clients)
 	r.GET("/oidc/authorize", oidcH.Authorize)
 	r.POST("/oidc/authorize", oidcH.AuthorizeSubmit)
 	r.POST("/oidc/token", oidcH.Token)
 	r.GET("/oidc/userinfo", oidcH.UserInfo)
 	r.StaticFS("/oidc/static", oidcH.StaticFS())
 
+	// Auth API (no basic auth — called via fetch from pages)
 	auth := r.Group("/auth")
 	{
 		auth.POST("/signup", h.SignUp)
@@ -49,7 +43,7 @@ func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandl
 		auth.GET("/oauth/callback", h.OAuthCallback)
 	}
 
-	// Protected routes
+	// Protected API (JWT required — no basic auth needed)
 	protected := r.Group("/api")
 	protected.Use(jwtMw.Verify())
 	{
@@ -58,6 +52,13 @@ func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandl
 		protected.GET("/link/google", h.LinkGoogle)
 		protected.DELETE("/link/:provider", h.UnlinkProvider)
 	}
+
+	// Apply basic auth to UI routes when configured
+	if cfg.BasicAuthEnabled() {
+		r.Use(middleware.BasicAuth(cfg.BasicAuthUser, cfg.BasicAuthPass))
+	}
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// User pages (provisional)
 	pagesH := pages.NewPagesHandler()
