@@ -8,11 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
+	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 type AdminHandler struct {
 	auth      cognito.AdminService
 	loginAuth cognito.Service
+	userUC    *usecase.UserUseCase
 	cfg       *config.Config
 	templates *template.Template
 	staticFS  fs.FS
@@ -22,6 +24,7 @@ func NewAdminHandler(auth cognito.AdminService, loginAuth cognito.Service, cfg *
 	return &AdminHandler{
 		auth:      auth,
 		loginAuth: loginAuth,
+		userUC:    usecase.NewUserUseCase(auth),
 		cfg:       cfg,
 		templates: parseTemplates(),
 		staticFS:  staticSubFS(),
@@ -131,8 +134,8 @@ func (h *AdminHandler) CreateUserSubmit(c *gin.Context) {
 
 func (h *AdminHandler) ConfirmUser(c *gin.Context) {
 	username := c.Param("username")
-	if err := h.auth.AdminConfirmSignUp(c.Request.Context(), username); err != nil {
-		h.setFlash(c, "error", "Failed to confirm user: "+err.Error())
+	if _, err := h.userUC.ConfirmUser(c.Request.Context(), username); err != nil {
+		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User confirmed")
 	}
@@ -151,28 +154,30 @@ func (h *AdminHandler) ResetPassword(c *gin.Context) {
 
 func (h *AdminHandler) DisableUser(c *gin.Context) {
 	username := c.Param("username")
-	if err := h.auth.AdminDisableUser(c.Request.Context(), username); err != nil {
-		h.setFlash(c, "error", "Failed to disable user: "+err.Error())
+	reason := c.DefaultPostForm("reason", "admin action")
+	if _, err := h.userUC.SuspendUser(c.Request.Context(), username, reason); err != nil {
+		h.setFlash(c, "error", err.Error())
 	} else {
-		h.setFlash(c, "success", "User disabled")
+		h.setFlash(c, "success", "User suspended")
 	}
 	c.Redirect(http.StatusSeeOther, "/admin/users/"+username)
 }
 
 func (h *AdminHandler) EnableUser(c *gin.Context) {
 	username := c.Param("username")
-	if err := h.auth.AdminEnableUser(c.Request.Context(), username); err != nil {
-		h.setFlash(c, "error", "Failed to enable user: "+err.Error())
+	if _, err := h.userUC.ReactivateUser(c.Request.Context(), username); err != nil {
+		h.setFlash(c, "error", err.Error())
 	} else {
-		h.setFlash(c, "success", "User enabled")
+		h.setFlash(c, "success", "User reactivated")
 	}
 	c.Redirect(http.StatusSeeOther, "/admin/users/"+username)
 }
 
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	username := c.Param("username")
-	if err := h.auth.AdminDeleteUser(c.Request.Context(), username); err != nil {
-		h.setFlash(c, "error", "Failed to delete user: "+err.Error())
+	reason := c.DefaultPostForm("reason", "admin action")
+	if _, err := h.userUC.DeleteUser(c.Request.Context(), username, reason); err != nil {
+		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User deleted")
 	}
