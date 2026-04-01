@@ -38,64 +38,73 @@ func (uc *UserUseCase) ListUsers(ctx context.Context, filter string, limit int32
 	return users, result.PaginationToken, nil
 }
 
-func (uc *UserUseCase) ConfirmUser(ctx context.Context, username string) (*domain.ActiveUser, error) {
+func (uc *UserUseCase) ConfirmUser(ctx context.Context, username, actor string) (*domain.ActiveUser, *domain.AuditEvent, error) {
 	user, err := uc.GetUser(ctx, username)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	pending, ok := user.(*domain.PendingUser)
 	if !ok {
-		return nil, fmt.Errorf("cannot confirm: user is %s", user.UserStatus())
+		return nil, nil, fmt.Errorf("cannot confirm: user is %s", user.UserStatus())
 	}
 
 	if err := uc.admin.AdminConfirmSignUp(ctx, username); err != nil {
-		return nil, fmt.Errorf("cognito confirm failed: %w", err)
+		return nil, nil, fmt.Errorf("cognito confirm failed: %w", err)
 	}
 
-	return pending.Confirm(), nil
+	active := pending.Confirm()
+	event := domain.NewAuditEvent(username, domain.AuditConfirm, actor, "")
+
+	return active, event, nil
 }
 
-func (uc *UserUseCase) SuspendUser(ctx context.Context, username, reason string) (*domain.SuspendedUser, error) {
+func (uc *UserUseCase) SuspendUser(ctx context.Context, username, reason, actor string) (*domain.SuspendedUser, *domain.AuditEvent, error) {
 	user, err := uc.GetUser(ctx, username)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	active, ok := user.(*domain.ActiveUser)
 	if !ok {
-		return nil, fmt.Errorf("cannot suspend: user is %s", user.UserStatus())
+		return nil, nil, fmt.Errorf("cannot suspend: user is %s", user.UserStatus())
 	}
 
 	if err := uc.admin.AdminDisableUser(ctx, username); err != nil {
-		return nil, fmt.Errorf("cognito disable failed: %w", err)
+		return nil, nil, fmt.Errorf("cognito disable failed: %w", err)
 	}
 
-	return active.Suspend(reason), nil
+	suspended := active.Suspend(reason)
+	event := domain.NewAuditEvent(username, domain.AuditSuspend, actor, reason)
+
+	return suspended, event, nil
 }
 
-func (uc *UserUseCase) ReactivateUser(ctx context.Context, username string) (*domain.ActiveUser, error) {
+func (uc *UserUseCase) ReactivateUser(ctx context.Context, username, actor string) (*domain.ActiveUser, *domain.AuditEvent, error) {
 	user, err := uc.GetUser(ctx, username)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	suspended, ok := user.(*domain.SuspendedUser)
 	if !ok {
-		return nil, fmt.Errorf("cannot reactivate: user is %s", user.UserStatus())
+		return nil, nil, fmt.Errorf("cannot reactivate: user is %s", user.UserStatus())
 	}
 
 	if err := uc.admin.AdminEnableUser(ctx, username); err != nil {
-		return nil, fmt.Errorf("cognito enable failed: %w", err)
+		return nil, nil, fmt.Errorf("cognito enable failed: %w", err)
 	}
 
-	return suspended.Reactivate(), nil
+	active := suspended.Reactivate()
+	event := domain.NewAuditEvent(username, domain.AuditReactivate, actor, "")
+
+	return active, event, nil
 }
 
-func (uc *UserUseCase) DeleteUser(ctx context.Context, username, reason string) (*domain.DeletedUser, error) {
+func (uc *UserUseCase) DeleteUser(ctx context.Context, username, reason, actor string) (*domain.DeletedUser, *domain.AuditEvent, error) {
 	user, err := uc.GetUser(ctx, username)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var deleted *domain.DeletedUser
@@ -106,20 +115,84 @@ func (uc *UserUseCase) DeleteUser(ctx context.Context, username, reason string) 
 	case *domain.SuspendedUser:
 		deleted = u.Delete(reason)
 	default:
-		return nil, fmt.Errorf("cannot delete: user is %s", user.UserStatus())
+		return nil, nil, fmt.Errorf("cannot delete: user is %s", user.UserStatus())
 	}
 
 	if err := uc.admin.AdminDeleteUser(ctx, username); err != nil {
-		return nil, fmt.Errorf("cognito delete failed: %w", err)
+		return nil, nil, fmt.Errorf("cognito delete failed: %w", err)
 	}
 
-	return deleted, nil
+	event := domain.NewAuditEvent(username, domain.AuditDelete, actor, reason)
+
+	return deleted, event, nil
+}
+
+func (uc *UserUseCase) AddRole(ctx context.Context, username, role, actor string) (*domain.AuditEvent, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	active, ok := user.(*domain.ActiveUser)
+	if !ok {
+		return nil, fmt.Errorf("cannot add role: user is %s", user.UserStatus())
+	}
+
+	roleSet := domain.NewRoleSet(username, active.Groups)
+	if !roleSet.Add(role) {
+		return nil, fmt.Errorf("user already has role: %s", role)
+	}
+
+	active.UpdateGroups(roleSet.Roles())
+	event := domain.NewAuditEvent(username, domain.AuditRoleAdd, actor, role)
+
+	return event, nil
+}
+
+func (uc *UserUseCase) RemoveRole(ctx context.Context, username, role, actor string) (*domain.AuditEvent, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	active, ok := user.(*domain.ActiveUser)
+	if !ok {
+		return nil, fmt.Errorf("cannot remove role: user is %s", user.UserStatus())
+	}
+
+	roleSet := domain.NewRoleSet(username, active.Groups)
+	if !roleSet.Remove(role) {
+		return nil, fmt.Errorf("user does not have role: %s", role)
+	}
+
+	active.UpdateGroups(roleSet.Roles())
+	event := domain.NewAuditEvent(username, domain.AuditRoleRemove, actor, role)
+
+	return event, nil
+}
+
+func (uc *UserUseCase) ResetPassword(ctx context.Context, username, actor string) (*domain.AuditEvent, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.UserStatus() == domain.StatusPending || user.UserStatus() == domain.StatusDeleted {
+		return nil, fmt.Errorf("cannot reset password: user is %s", user.UserStatus())
+	}
+
+	if err := uc.admin.AdminResetPassword(ctx, username); err != nil {
+		return nil, fmt.Errorf("cognito reset password failed: %w", err)
+	}
+
+	event := domain.NewAuditEvent(username, domain.AuditPasswordReset, actor, "")
+
+	return event, nil
 }
 
 func toDomainUser(d *cognito.AdminUserDetail) domain.User {
 	status := mapCognitoStatus(d.Status, d.Enabled)
 
-	// Extract groups from Cognito attributes if present
 	var groups []string
 	if g, ok := d.Attributes["cognito:groups"]; ok && g != "" {
 		groups = []string{g}

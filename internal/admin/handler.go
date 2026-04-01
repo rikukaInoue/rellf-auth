@@ -134,7 +134,8 @@ func (h *AdminHandler) CreateUserSubmit(c *gin.Context) {
 
 func (h *AdminHandler) ConfirmUser(c *gin.Context) {
 	username := c.Param("username")
-	if _, err := h.userUC.ConfirmUser(c.Request.Context(), username); err != nil {
+	actor := h.getActor(c)
+	if _, _, err := h.userUC.ConfirmUser(c.Request.Context(), username, actor); err != nil {
 		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User confirmed")
@@ -144,8 +145,9 @@ func (h *AdminHandler) ConfirmUser(c *gin.Context) {
 
 func (h *AdminHandler) ResetPassword(c *gin.Context) {
 	username := c.Param("username")
-	if err := h.auth.AdminResetPassword(c.Request.Context(), username); err != nil {
-		h.setFlash(c, "error", "Failed to reset password: "+err.Error())
+	actor := h.getActor(c)
+	if _, err := h.userUC.ResetPassword(c.Request.Context(), username, actor); err != nil {
+		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "Password reset initiated")
 	}
@@ -155,7 +157,8 @@ func (h *AdminHandler) ResetPassword(c *gin.Context) {
 func (h *AdminHandler) DisableUser(c *gin.Context) {
 	username := c.Param("username")
 	reason := c.DefaultPostForm("reason", "admin action")
-	if _, err := h.userUC.SuspendUser(c.Request.Context(), username, reason); err != nil {
+	actor := h.getActor(c)
+	if _, _, err := h.userUC.SuspendUser(c.Request.Context(), username, reason, actor); err != nil {
 		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User suspended")
@@ -165,7 +168,8 @@ func (h *AdminHandler) DisableUser(c *gin.Context) {
 
 func (h *AdminHandler) EnableUser(c *gin.Context) {
 	username := c.Param("username")
-	if _, err := h.userUC.ReactivateUser(c.Request.Context(), username); err != nil {
+	actor := h.getActor(c)
+	if _, _, err := h.userUC.ReactivateUser(c.Request.Context(), username, actor); err != nil {
 		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User reactivated")
@@ -176,12 +180,22 @@ func (h *AdminHandler) EnableUser(c *gin.Context) {
 func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	username := c.Param("username")
 	reason := c.DefaultPostForm("reason", "admin action")
-	if _, err := h.userUC.DeleteUser(c.Request.Context(), username, reason); err != nil {
+	actor := h.getActor(c)
+	if _, _, err := h.userUC.DeleteUser(c.Request.Context(), username, reason, actor); err != nil {
 		h.setFlash(c, "error", err.Error())
 	} else {
 		h.setFlash(c, "success", "User deleted")
 	}
 	c.Redirect(http.StatusSeeOther, "/admin/users")
+}
+
+func (h *AdminHandler) getActor(c *gin.Context) string {
+	if actor, exists := c.Get("admin_user"); exists {
+		if s, ok := actor.(string); ok {
+			return s
+		}
+	}
+	return "admin"
 }
 
 // --- helpers ---
