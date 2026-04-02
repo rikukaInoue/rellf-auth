@@ -96,3 +96,29 @@ body {
 .btn-login:hover {
     background: #1d4ed8;
 }
+
+.login-hint {
+    text-align: center;
+    color: #888;
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.5;
+}
+
+.btn-skip {
+    width: 100%;
+    padding: 0.7rem;
+    background: none;
+    color: #888;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: all 0.15s;
+}
+
+.btn-skip:hover {
+    color: #555;
+    border-color: #999;
+}

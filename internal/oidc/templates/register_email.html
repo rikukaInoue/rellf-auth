@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メールアドレス登録 — rellf</title>
+    <link rel="stylesheet" href="/oidc/static/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <h1 class="login-title">rellf</h1>
+            <p class="login-subtitle">メールアドレスを登録しませんか？</p>
+            <p class="login-hint">メールアドレスを登録すると、パスワードリセットや通知を受け取れます。</p>
+
+            {{if .Error}}
+            <div class="error-message">{{.Error}}</div>
+            {{end}}
+
+            <form method="POST" action="/oidc/register-email">
+                <input type="hidden" name="token" value="{{.Token}}">
+
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" name="email"
+                           placeholder="you@example.com" autofocus>
+                </div>
+
+                <button type="submit" class="btn-login">登録する</button>
+            </form>
+
+            <form method="POST" action="/oidc/register-email-skip">
+                <input type="hidden" name="token" value="{{.Token}}">
+                <button type="submit" class="btn-skip">スキップ</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
