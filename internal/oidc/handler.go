@@ -189,10 +189,82 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 
 	scopes := strings.Split(scope, " ")
 
-	// Build authorization code
+	// Check if user has no email — prompt registration
+	if emailClaim == "" {
+		// Encode OIDC params + user info into a token for the registration flow
+		regPayload := &AuthCodePayload{
+			Sub:                 sub,
+			Groups:              groups,
+			ClientID:            clientID,
+			RedirectURI:         redirectURI,
+			Scopes:              scopes,
+			Nonce:               nonce,
+			CodeChallenge:       codeChallenge,
+			CodeChallengeMethod: codeChallengeMethod,
+			ExpiresAt:           time.Now().Add(10 * time.Minute).Unix(),
+		}
+		token, err := h.codec.Encode(regPayload)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
+			return
+		}
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		h.templates.ExecuteTemplate(c.Writer, "register_email.html", gin.H{
+			"Token": token,
+		})
+		return
+	}
+
+	h.issueCodeAndRedirect(c, sub, emailClaim, groups, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod)
+}
+
+// RegisterEmail handles email registration for users without email (POST /oidc/register-email).
+func (h *OIDCHandler) RegisterEmail(c *gin.Context) {
+	tokenStr := c.PostForm("token")
+	email := c.PostForm("email")
+
+	payload, err := h.codec.Decode(tokenStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+		return
+	}
+
+	if email == "" {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		h.templates.ExecuteTemplate(c.Writer, "register_email.html", gin.H{
+			"Token": tokenStr,
+			"Error": "メールアドレスを入力してください",
+		})
+		return
+	}
+
+	// TODO: Update Cognito user with email attribute and send verification
+	// For now, proceed with the email
+
+	scope := strings.Join(payload.Scopes, " ")
+	h.issueCodeAndRedirect(c, payload.Sub, email, payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod)
+}
+
+// RegisterEmailSkip skips email registration (POST /oidc/register-email-skip).
+func (h *OIDCHandler) RegisterEmailSkip(c *gin.Context) {
+	tokenStr := c.PostForm("token")
+
+	payload, err := h.codec.Decode(tokenStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid or expired token"})
+		return
+	}
+
+	scope := strings.Join(payload.Scopes, " ")
+	h.issueCodeAndRedirect(c, payload.Sub, "", payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod)
+}
+
+func (h *OIDCHandler) issueCodeAndRedirect(c *gin.Context, sub, email string, groups []string, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod string) {
+	scopes := strings.Split(scope, " ")
+
 	payload := &AuthCodePayload{
 		Sub:                 sub,
-		Email:               emailClaim,
+		Email:               email,
 		Groups:              groups,
 		ClientID:            clientID,
 		RedirectURI:         redirectURI,
@@ -209,7 +281,6 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		return
 	}
 
-	// Redirect with code and state
 	redirect := redirectURI + "?code=" + code
 	if state != "" {
 		redirect += "&state=" + state

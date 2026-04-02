@@ -31,6 +31,8 @@ func Setup(h *handler.Handler, adminH *admin.AdminHandler, oidcH *oidc.OIDCHandl
 	// OIDC Provider endpoints (no basic auth — used by external clients)
 	r.GET("/oidc/authorize", oidcH.Authorize)
 	r.POST("/oidc/authorize", oidcH.AuthorizeSubmit)
+	r.POST("/oidc/register-email", oidcH.RegisterEmail)
+	r.POST("/oidc/register-email-skip", oidcH.RegisterEmailSkip)
 	r.POST("/oidc/token", oidcH.Token)
 	r.GET("/oidc/userinfo", oidcH.UserInfo)
 	r.StaticFS("/oidc/static", oidcH.StaticFS())
