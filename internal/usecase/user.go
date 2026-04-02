@@ -190,6 +190,67 @@ func (uc *UserUseCase) ResetPassword(ctx context.Context, username, actor string
 	return event, nil
 }
 
+func (uc *UserUseCase) RegisterEmail(ctx context.Context, username, email, actor string) (*domain.ActiveUser, *domain.AuditEvent, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	active, ok := user.(*domain.ActiveUser)
+	if !ok {
+		return nil, nil, fmt.Errorf("cannot register email: user is %s", user.UserStatus())
+	}
+
+	if active.Email != "" {
+		return nil, nil, fmt.Errorf("user already has email: %s", active.Email)
+	}
+
+	// TODO: Call Cognito AdminUpdateUserAttributes to set email
+	// TODO: Trigger email verification
+
+	active.Email = email
+	event := domain.NewAuditEvent(username, domain.AuditConfirm, actor, "email registered: "+email)
+
+	return active, event, nil
+}
+
+func (uc *UserUseCase) RecordLogin(ctx context.Context, username string) (*domain.ActiveUser, *domain.AuditEvent, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	active, ok := user.(*domain.ActiveUser)
+	if !ok {
+		return nil, nil, fmt.Errorf("cannot record login: user is %s", user.UserStatus())
+	}
+
+	active.RecordLogin()
+	event := domain.NewAuditEvent(username, domain.AuditLogin, "system", "")
+
+	return active, event, nil
+}
+
+func (uc *UserUseCase) ValidateLoginState(ctx context.Context, username string) (domain.User, error) {
+	user, err := uc.GetUser(ctx, username)
+	if err != nil {
+		return nil, err
+	}
+
+	switch user.(type) {
+	case *domain.SuspendedUser:
+		return user, fmt.Errorf("account is suspended")
+	case *domain.DeletedUser:
+		return user, fmt.Errorf("account is deleted")
+	case *domain.PendingUser:
+		return user, fmt.Errorf("account is not confirmed")
+	case *domain.ActiveUser:
+		return user, nil
+	default:
+		return user, fmt.Errorf("unknown user status")
+	}
+}
+
 func toDomainUser(d *cognito.AdminUserDetail) domain.User {
 	status := mapCognitoStatus(d.Status, d.Enabled)
 

@@ -15,11 +15,14 @@ import (
 
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
+	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 // OIDCHandler handles all OIDC Provider endpoints.
 type OIDCHandler struct {
 	cognito   cognito.Service
+	userUC    *usecase.UserUseCase
 	issuer    *TokenIssuer
 	codec     *AuthCodeCodec
 	clients   *ClientRegistry
@@ -31,6 +34,7 @@ type OIDCHandler struct {
 // NewOIDCHandler creates a new OIDCHandler.
 func NewOIDCHandler(
 	cognitoSvc cognito.Service,
+	adminSvc cognito.AdminService,
 	issuer *TokenIssuer,
 	codec *AuthCodeCodec,
 	clients *ClientRegistry,
@@ -38,6 +42,7 @@ func NewOIDCHandler(
 ) *OIDCHandler {
 	return &OIDCHandler{
 		cognito:   cognitoSvc,
+		userUC:    usecase.NewUserUseCase(adminSvc),
 		issuer:    issuer,
 		codec:     codec,
 		clients:   clients,
@@ -187,6 +192,39 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		}
 	}
 
+	// Validate user lifecycle state via domain model
+	_, validateErr := h.userUC.ValidateLoginState(c.Request.Context(), sub)
+	if validateErr != nil {
+		errorMsg := "ログインできません。管理者にお問い合わせください。"
+		if user, _ := h.userUC.GetUser(c.Request.Context(), sub); user != nil {
+			switch user.(type) {
+			case *domain.SuspendedUser:
+				errorMsg = "このアカウントは一時停止されています。管理者にお問い合わせください。"
+			case *domain.DeletedUser:
+				errorMsg = "このアカウントは削除されています。"
+			}
+		}
+		data := loginPageData{
+			ClientID:            clientID,
+			RedirectURI:         redirectURI,
+			ResponseType:        responseType,
+			Scope:               scope,
+			State:               state,
+			Nonce:               nonce,
+			CodeChallenge:       codeChallenge,
+			CodeChallengeMethod: codeChallengeMethod,
+			Email:               email,
+			Error:               errorMsg,
+		}
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.Status(http.StatusOK)
+		h.templates.ExecuteTemplate(c.Writer, "login.html", data)
+		return
+	}
+
+	// Record login
+	h.userUC.RecordLogin(c.Request.Context(), sub)
+
 	scopes := strings.Split(scope, " ")
 
 	// Check if user has no email — prompt registration
@@ -238,8 +276,16 @@ func (h *OIDCHandler) RegisterEmail(c *gin.Context) {
 		return
 	}
 
-	// TODO: Update Cognito user with email attribute and send verification
-	// For now, proceed with the email
+	// Register email via usecase (validates user state)
+	_, _, err = h.userUC.RegisterEmail(c.Request.Context(), payload.Sub, email, "system")
+	if err != nil {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		h.templates.ExecuteTemplate(c.Writer, "register_email.html", gin.H{
+			"Token": tokenStr,
+			"Error": err.Error(),
+		})
+		return
+	}
 
 	scope := strings.Join(payload.Scopes, " ")
 	h.issueCodeAndRedirect(c, payload.Sub, email, payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod)
