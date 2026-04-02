@@ -49,6 +49,12 @@ resource "aws_cognito_user_pool" "main" {
   }
 }
 
+resource "aws_cognito_user_group" "groups" {
+  for_each     = toset(var.user_groups)
+  name         = each.value
+  user_pool_id = aws_cognito_user_pool.main.id
+}
+
 resource "aws_cognito_user_pool_domain" "main" {
   domain       = var.cognito_domain_prefix
   user_pool_id = aws_cognito_user_pool.main.id

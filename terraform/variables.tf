@@ -80,6 +80,18 @@ variable "oidc_clients" {
   type        = string
 }
 
+variable "user_groups" {
+  description = "Initial user groups managed by Terraform"
+  type        = list(string)
+  default = [
+    "admin",
+    "lawyer",
+    "zeirishi",
+    "site:editor",
+    "site:viewer",
+  ]
+}
+
 variable "cors_origins" {
   description = "Comma-separated list of allowed CORS origins"
   type        = string
