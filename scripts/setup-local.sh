@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ENDPOINT="http://localhost:4566"
 REGION="ap-northeast-1"
 
@@ -11,7 +13,7 @@ export AWS_DEFAULT_REGION=$REGION
 echo "==> Creating Cognito User Pool..."
 POOL_ID=$(aws cognito-idp create-user-pool \
   --pool-name rellf-auth-local \
-  --username-attributes email \
+  --alias-attributes email \
   --auto-verified-attributes email \
   --policies 'PasswordPolicy={MinimumLength=8,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=true}' \
   --endpoint-url "$ENDPOINT" \
@@ -31,7 +33,7 @@ CLIENT_SECRET="local-dummy-secret"
 echo "    Client ID: $CLIENT_ID"
 
 echo "==> Writing .env.local..."
-cat > "$(dirname "$0")/../.env.local" <<EOF
+cat > "$PROJECT_DIR/.env.local" <<EOF
 AWS_REGION=$REGION
 AWS_ENDPOINT_URL=$ENDPOINT
 AWS_ACCESS_KEY_ID=test
@@ -48,38 +50,71 @@ OIDC_AUTH_CODE_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abc
 OIDC_CLIENTS=test-client::public:http://localhost:3000/callback
 EOF
 
-echo "==> Creating admin group..."
-aws cognito-idp create-group \
-  --user-pool-id "$POOL_ID" \
-  --group-name admin \
-  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+# --- Load fixtures ---
 
-echo "==> Creating admin user..."
-aws cognito-idp sign-up \
-  --client-id "$CLIENT_ID" \
-  --username admin@example.com \
-  --password "Admin1234!" \
-  --user-attributes Name=email,Value=admin@example.com \
-  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+GROUPS_FILE="$PROJECT_DIR/fixtures/groups.json"
+USERS_FILE="$PROJECT_DIR/fixtures/users.json"
 
-aws cognito-idp admin-confirm-sign-up \
-  --user-pool-id "$POOL_ID" \
-  --username admin@example.com \
-  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || \
-aws cognito-idp confirm-sign-up \
-  --client-id "$CLIENT_ID" \
-  --username admin@example.com \
-  --confirmation-code 000000 \
-  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+echo "==> Creating groups from fixtures..."
+for group in $(python3 -c "import json; [print(g) for g in json.load(open('$GROUPS_FILE'))]"); do
+  aws cognito-idp create-group \
+    --user-pool-id "$POOL_ID" \
+    --group-name "$group" \
+    --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+  echo "    Group: $group"
+done
 
-aws cognito-idp admin-add-user-to-group \
-  --user-pool-id "$POOL_ID" \
-  --username admin@example.com \
-  --group-name admin \
-  --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
-echo "    Admin: admin@example.com / Admin1234!"
+echo "==> Creating users from fixtures..."
+USER_COUNT=$(python3 -c "import json; print(len(json.load(open('$USERS_FILE'))))")
+for i in $(seq 0 $((USER_COUNT - 1))); do
+  EMAIL=$(python3 -c "import json; u=json.load(open('$USERS_FILE'))[$i]; print(u.get('email', ''))")
+  USERNAME=$(python3 -c "import json; u=json.load(open('$USERS_FILE'))[$i]; print(u.get('username', u.get('email', '')))")
+  PASSWORD=$(python3 -c "import json; print(json.load(open('$USERS_FILE'))[$i]['password'])")
+  CONFIRMED=$(python3 -c "import json; print(json.load(open('$USERS_FILE'))[$i]['confirmed'])")
+  GROUPS=$(python3 -c "import json; print(' '.join(json.load(open('$USERS_FILE'))[$i]['groups']))")
+
+  # Sign up
+  if [ -n "$EMAIL" ]; then
+    aws cognito-idp sign-up \
+      --client-id "$CLIENT_ID" \
+      --username "$USERNAME" \
+      --password "$PASSWORD" \
+      --user-attributes Name=email,Value="$EMAIL" \
+      --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+  else
+    aws cognito-idp sign-up \
+      --client-id "$CLIENT_ID" \
+      --username "$USERNAME" \
+      --password "$PASSWORD" \
+      --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+  fi
+
+  # Confirm if needed
+  if [ "$CONFIRMED" = "True" ]; then
+    aws cognito-idp admin-confirm-sign-up \
+      --user-pool-id "$POOL_ID" \
+      --username "$USERNAME" \
+      --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || \
+    aws cognito-idp confirm-sign-up \
+      --client-id "$CLIENT_ID" \
+      --username "$USERNAME" \
+      --confirmation-code 000000 \
+      --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+  fi
+
+  # Add to groups
+  for group in $GROUPS; do
+    aws cognito-idp admin-add-user-to-group \
+      --user-pool-id "$POOL_ID" \
+      --username "$USERNAME" \
+      --group-name "$group" \
+      --endpoint-url "$ENDPOINT" > /dev/null 2>&1 || true
+  done
+
+  echo "    User: $USERNAME (groups: $GROUPS) $([ "$CONFIRMED" = "True" ] && echo "[confirmed]" || echo "[pending]")"
+done
 
 echo ""
 echo "==> Setup complete!"
 echo "    Run: make dev-local"
-echo "    Admin: http://localhost:8080/admin/login"
+echo "    Admin: http://localhost:8080/admin/login (admin@example.com / Admin1234!)"

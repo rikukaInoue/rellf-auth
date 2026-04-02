@@ -1,0 +1,50 @@
+[
+  {
+    "email": "admin@example.com",
+    "password": "Admin1234!",
+    "groups": ["admin"],
+    "confirmed": true
+  },
+  {
+    "email": "lawyer@example.com",
+    "password": "Lawyer1234!",
+    "groups": ["lawyer"],
+    "confirmed": true
+  },
+  {
+    "email": "zeirishi@example.com",
+    "password": "Zeirishi1234!",
+    "groups": ["zeirishi"],
+    "confirmed": true
+  },
+  {
+    "email": "editor@example.com",
+    "password": "Editor1234!",
+    "groups": ["site:editor"],
+    "confirmed": true
+  },
+  {
+    "email": "viewer@example.com",
+    "password": "Viewer1234!",
+    "groups": ["site:viewer"],
+    "confirmed": true
+  },
+  {
+    "username": "user-no-email",
+    "password": "NoEmail1234!",
+    "groups": [],
+    "confirmed": true
+  },
+  {
+    "email": "pending@example.com",
+    "password": "Pending1234!",
+    "groups": [],
+    "confirmed": false
+  },
+  {
+    "email": "multi@example.com",
+    "password": "Multi1234!",
+    "groups": ["lawyer", "site:editor"],
+    "confirmed": true
+  }
+]
