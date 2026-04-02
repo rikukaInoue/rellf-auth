@@ -70,7 +70,7 @@ func main() {
 	}
 	clientRegistry := oidc.NewClientRegistry(oidcClients)
 
-	oidcH := oidc.NewOIDCHandler(cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
+	oidcH := oidc.NewOIDCHandler(cognitoClient, cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
 
 	h := handler.New(cognitoClient, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
