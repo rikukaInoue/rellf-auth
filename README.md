@@ -1,6 +1,6 @@
 # rellf-auth
 
-AWS Cognito ベースの認証 API。メール/パスワード認証と Google OAuth をサポート。
+AWS Cognito ベースの認証 API。OIDC Provider として機能し、メール/パスワード認証、Google OAuth、OpenID 2.0 外部 IdP 連携をサポート。
 
 ## 技術スタック
 
@@ -12,31 +12,160 @@ AWS Cognito ベースの認証 API。メール/パスワード認証と Google O
 - **Terraform** — IaC
 - **floci** — ローカル開発用 AWS エミュレータ
 
+## アーキテクチャ
+
+```
+                    ┌──────────────────────────────────────┐
+                    │            クライアントアプリ           │
+                    └──────────────────┬───────────────────┘
+                                      │ OIDC (Authorization Code + PKCE)
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         rellf-auth                                  │
+│                                                                     │
+│  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │  Router   │→│  Handler   │→│ UseCase  │→│  Domain Model     │  │
+│  │          │  │  (OIDC/    │  │          │  │  (User Lifecycle) │  │
+│  │          │  │   Admin)   │  │          │  │                   │  │
+│  └──────────┘  └───────────┘  └────┬─────┘  └──────────────────┘  │
+│                                     │                               │
+│                                     ▼                               │
+│                              ┌─────────────┐                       │
+│                              │  Cognito     │                       │
+│                              │  Client      │                       │
+│                              └──────┬──────┘                       │
+└─────────────────────────────────────┼───────────────────────────────┘
+                                      │
+                    ┌─────────────────┼─────────────────┐
+                    ▼                 ▼                  ▼
+            ┌──────────┐     ┌──────────────┐    ┌───────────┐
+            │ Cognito   │     │ SSM Parameter│    │ Google    │
+            │ User Pool │     │ Store        │    │ OAuth     │
+            └──────────┘     └──────────────┘    └───────────┘
+```
+
+### 連携サービス
+
+```
+rellf-auth ◄──JWT検証──► rellf-authz (認可サービス / AVP)
+                          https://authz.rikuka.dev
+
+rellf-auth ◄──OIDC────► クライアントアプリ
+                          例: harmony-etml, 管理ツール等
+```
+
 ## ディレクトリ構成
 
 ```
 cmd/
-  lambda/main.go          # Lambda エントリポイント
-  server/main.go          # ローカル開発用サーバー
-  trigger/presignup/      # Pre Sign-up Lambda トリガー（アカウント自動リンク）
+  lambda/main.go              # Lambda エントリポイント
+  server/main.go              # ローカル開発用サーバー
+  trigger/presignup/          # Pre Sign-up Lambda トリガー
 internal/
-  handler/                # HTTP ハンドラー
-  middleware/jwt.go       # JWT 検証ミドルウェア
-  cognito/client.go       # Cognito SDK ラッパー
-  config/config.go        # 環境変数 + SSM 解決
-  router/router.go        # ルーティング定義
-terraform/                # Terraform 構成
-scripts/setup-local.sh    # floci ローカル環境セットアップ
-docs/                     # Swagger 自動生成ドキュメント
+  domain/                     # ドメインモデル（User Lifecycle）
+    user.go                   #   User interface + 状態別 struct
+    credential.go             #   認証情報（パスワード/MFA）
+    role.go                   #   ロール管理（RoleSet）
+    session.go                #   セッション・ログイン履歴
+    audit.go                  #   監査イベント
+  usecase/                    # ユースケース層
+    user.go                   #   ユーザー操作（状態遷移 + Cognito 連携）
+  handler/                    # 認証 API ハンドラー
+  admin/                      # 管理画面ハンドラー
+  oidc/                       # OIDC Provider エンドポイント
+  cognito/                    # Cognito SDK ラッパー
+    client.go                 #   認証操作（Service interface）
+    admin.go                  #   管理操作（AdminService interface）
+  middleware/                 # JWT 検証・CORS・Basic Auth
+  config/                     # 環境変数 + SSM 解決
+  router/                     # ルーティング定義
+terraform/                    # Terraform 構成
+docs/                         # アーキテクチャ図・手順書
 ```
+
+## ユースケースと Cognito API の対応
+
+### ユーザーライフサイクル
+
+| ユースケース | ドメイン遷移 | Cognito API |
+|-------------|-------------|-------------|
+| ユーザー取得 | → `User` interface | `AdminGetUser` |
+| ユーザー一覧 | → `[]User` | `ListUsers` |
+| アカウント確認 | `PendingUser` → `ActiveUser` | `AdminConfirmSignUp` |
+| 一時停止 | `ActiveUser` → `SuspendedUser` | `AdminDisableUser` |
+| 復帰 | `SuspendedUser` → `ActiveUser` | `AdminEnableUser` |
+| 削除 | `ActiveUser/SuspendedUser` → `DeletedUser` | `AdminDeleteUser` |
+| ログイン検証 | `ActiveUser` のみ許可 | `InitiateAuth` (USER_PASSWORD_AUTH) |
+| ログイン記録 | `ActiveUser.RecordLogin()` | — (ドメインのみ) |
+
+### ロール管理
+
+| ユースケース | ドメイン操作 | Cognito API |
+|-------------|-------------|-------------|
+| ロール追加 | `RoleSet.Add()` | `AdminAddUserToGroup` |
+| ロール削除 | `RoleSet.Remove()` | `AdminRemoveUserFromGroup` |
+| ロール確認 | `RoleSet.HasRole()` | `AdminListGroupsForUser` |
+
+### 認証情報
+
+| ユースケース | ドメイン操作 | Cognito API |
+|-------------|-------------|-------------|
+| パスワードリセット | `Credential.PasswordReset()` | `AdminResetUserPassword` |
+| メール登録 | `ActiveUser.Email` 更新 | `AdminUpdateUserAttributes` |
+| ユーザー作成 | → `PendingUser` | `AdminCreateUser` |
+
+### OIDC フロー
+
+| ユースケース | ドメイン操作 | Cognito API |
+|-------------|-------------|-------------|
+| 認証 (パスワード) | `ValidateLoginState()` | `InitiateAuth` |
+| 認証 (Google OAuth) | `ValidateLoginState()` | OAuth 2.0 フロー |
+| 認証 (OpenID 2.0) | `ValidateLoginState()` | — (外部 OP) + `AdminLinkProviderForUser` |
+| メール登録促進 | `RegisterEmail()` | `AdminUpdateUserAttributes` |
+| トークン発行 | — | — (rellf-auth 自前署名) |
+
+### 外部 IdP 連携
+
+| ユースケース | Cognito API |
+|-------------|-------------|
+| 外部 ID リンク | `AdminLinkProviderForUser` |
+| 外部 ID リンク解除 | `AdminDisableProviderForUser` |
+| リンク済みプロバイダ一覧 | `AdminGetUser` → `identities` 属性 |
+| アカウント統合 | `AdminDisableProviderForUser` + `AdminLinkProviderForUser` + `AdminDeleteUser` |
+
+### 監査イベント
+
+| イベント種別 | タイミング |
+|-------------|-----------|
+| `signup` | ユーザー登録時 |
+| `confirm` | アカウント確認時 |
+| `login` | ログイン成功時 |
+| `suspend` | 一時停止時 |
+| `reactivate` | 復帰時 |
+| `delete` | 削除時 |
+| `role_add` | ロール追加時 |
+| `role_remove` | ロール削除時 |
+| `password_reset` | パスワードリセット時 |
 
 ## API エンドポイント
 
-### 公開
+### OIDC Provider
 
 | メソッド | パス | 説明 |
 |---------|------|------|
-| GET | `/health` | ヘルスチェック |
+| GET | `/.well-known/openid-configuration` | OIDC Discovery |
+| GET | `/oidc/jwks.json` | JWKS (公開鍵) |
+| GET | `/oidc/authorize` | 認可エンドポイント (ログイン画面) |
+| POST | `/oidc/authorize` | ログイン処理 |
+| POST | `/oidc/register-email` | メールアドレス登録 |
+| POST | `/oidc/register-email-skip` | メール登録スキップ |
+| POST | `/oidc/token` | トークン交換 |
+| GET | `/oidc/userinfo` | ユーザー情報 |
+
+### 認証 API
+
+| メソッド | パス | 説明 |
+|---------|------|------|
 | POST | `/auth/signup` | ユーザー登録 |
 | POST | `/auth/confirm-signup` | メール確認 |
 | POST | `/auth/login` | ログイン |
@@ -45,7 +174,7 @@ docs/                     # Swagger 自動生成ドキュメント
 | GET | `/auth/oauth/google` | Google OAuth リダイレクト |
 | GET | `/auth/oauth/callback` | OAuth コールバック |
 
-### 認証必須 (`Authorization: Bearer <token>`)
+### 保護 API (`Authorization: Bearer <token>`)
 
 | メソッド | パス | 説明 |
 |---------|------|------|
@@ -54,8 +183,6 @@ docs/                     # Swagger 自動生成ドキュメント
 | GET | `/api/link/google` | Google アカウントリンク |
 | DELETE | `/api/link/:provider` | プロバイダリンク解除 |
 
-Swagger UI: `http://localhost:8080/swagger/index.html`
-
 ### 管理画面 (`/admin`)
 
 | パス | 説明 |
@@ -63,11 +190,7 @@ Swagger UI: `http://localhost:8080/swagger/index.html`
 | `/admin/login` | 管理者ログイン |
 | `/admin/users` | ユーザー一覧・検索 |
 | `/admin/users/new` | ユーザー作成 |
-| `/admin/users/:username` | ユーザー詳細・操作（確認・無効化・有効化・パスワードリセット・削除） |
-
-管理画面: `http://localhost:8080/admin/login`
-
-ローカル開発時の管理者: `admin@example.com` / `Admin1234!`
+| `/admin/users/:username` | ユーザー詳細・操作 |
 
 ## ローカル開発
 
@@ -79,85 +202,32 @@ Swagger UI: `http://localhost:8080/swagger/index.html`
 
 ### floci を使ったローカル開発（推奨）
 
-実際の AWS アカウント不要で開発できます。
-
 ```bash
-# 1. floci 起動 + Cognito リソース作成 + .env.local 生成
-make floci-setup
-
-# 2. ローカルサーバー起動
-make dev-local
+make floci-setup    # floci 起動 + Cognito リソース作成 + .env.local 生成
+make dev-local      # ローカルサーバー起動
 ```
 
 ### AWS 直接接続での開発
 
 ```bash
-# .env を作成して AWS リソースの情報を設定
 cp .env.example .env
 # .env を編集
-
-# サーバー起動
 make dev
 ```
 
-### 環境変数
-
-| 変数 | 必須 | 説明 |
-|------|------|------|
-| `AWS_REGION` | Yes | AWS リージョン |
-| `AWS_ENDPOINT_URL` | No | カスタムエンドポイント（floci 用） |
-| `COGNITO_POOL_ID` | Yes | Cognito User Pool ID |
-| `COGNITO_CLIENT_ID` | Yes | Cognito Client ID |
-| `COGNITO_CLIENT_SECRET` | Yes | Cognito Client Secret（`ssm:` プレフィックスで SSM 参照可） |
-| `COGNITO_DOMAIN` | Yes | Cognito ドメイン |
-| `OAUTH_CALLBACK_URL` | Yes | OAuth コールバック URL |
-
-`COGNITO_CLIENT_SECRET=ssm:/rellf-auth/cognito-client-secret` のように設定すると、起動時に SSM Parameter Store から値を取得します。
-
 ## テスト
 
-floci に対する結合テストです。モックは使用しません。
-
 ```bash
-# floci 起動 + テスト実行（一発）
-make test
-
-# floci が既に起動済みの場合
-source .env.local && go test -tags integration -v -count=1 ./...
+make test           # floci 起動 + 結合テスト実行
 ```
 
 ## ビルド・デプロイ
 
 ```bash
-# Lambda 用バイナリビルド
-make build
+make build          # Lambda 用バイナリビルド
+make zip            # デプロイ用 zip 作成
 
-# デプロイ用 zip 作成
-make zip
-
-# Terraform デプロイ
 cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# terraform.tfvars を編集
 terraform init
 terraform apply
 ```
-
-### Terraform に必要な変数
-
-| 変数 | 説明 |
-|------|------|
-| `cognito_domain_prefix` | Cognito ドメインのプレフィックス |
-| `google_client_id` | Google OAuth クライアント ID |
-| `google_client_secret` | Google OAuth クライアントシークレット |
-
-## その他
-
-```bash
-make fmt        # コードフォーマット
-make vet        # 静的解析
-make swagger    # Swagger ドキュメント再生成
-make tidy       # go mod tidy
-```
-
-lefthook が設定済みで、コミット時に Swagger ドキュメントが自動再生成されます。
