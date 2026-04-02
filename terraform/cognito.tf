@@ -1,8 +1,12 @@
 resource "aws_cognito_user_pool" "main" {
   name = var.project_name
 
-  username_attributes      = ["email"]
+  alias_attributes         = ["email"]
   auto_verified_attributes = ["email"]
+
+  username_configuration {
+    case_sensitive = false
+  }
 
   password_policy {
     minimum_length                   = 8
@@ -16,7 +20,7 @@ resource "aws_cognito_user_pool" "main" {
   schema {
     name                = "email"
     attribute_data_type = "String"
-    required            = true
+    required            = false
     mutable             = true
 
     string_attribute_constraints {
