@@ -37,7 +37,9 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   email_configuration {
-    email_sending_account = "COGNITO_DEFAULT"
+    email_sending_account  = "DEVELOPER"
+    from_email_address     = "no-reply@${var.domain_zone}"
+    source_arn             = aws_sesv2_email_identity.main.arn
   }
 
   verification_message_template {
@@ -45,7 +47,8 @@ resource "aws_cognito_user_pool" "main" {
   }
 
   lambda_config {
-    pre_sign_up = aws_lambda_function.presignup.arn
+    pre_sign_up    = aws_lambda_function.presignup.arn
+    custom_message = aws_lambda_function.custommessage.arn
   }
 
   tags = {

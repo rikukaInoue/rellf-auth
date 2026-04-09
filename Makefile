@@ -1,6 +1,6 @@
-.PHONY: build build-api build-presignup clean zip tidy fmt vet swagger dev dev-local floci-up floci-setup floci-restart local test
+.PHONY: build build-api build-presignup build-custommessage clean zip tidy fmt vet swagger dev dev-local floci-up floci-setup floci-restart local test
 
-build: build-api build-presignup
+build: build-api build-presignup build-custommessage
 
 build-api:
 	GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o dist/api/bootstrap cmd/lambda/main.go
@@ -8,12 +8,16 @@ build-api:
 build-presignup:
 	GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o dist/presignup/bootstrap cmd/trigger/presignup/main.go
 
+build-custommessage:
+	GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o dist/custommessage/bootstrap cmd/trigger/custommessage/main.go
+
 clean:
 	rm -rf dist/
 
 zip: build
 	cd dist/api && zip -j ../../function.zip bootstrap
 	cd dist/presignup && zip -j ../../presignup.zip bootstrap
+	cd dist/custommessage && zip -j ../../custommessage.zip bootstrap
 
 tidy:
 	go mod tidy

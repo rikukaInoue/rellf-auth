@@ -3,6 +3,7 @@ package cognito
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -80,12 +81,22 @@ func (c *Client) computeSecretHash(username string) string {
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
 }
 
+func generateUUID() string {
+	var uuid [16]byte
+	_, _ = rand.Read(uuid[:])
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // variant 1
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
+}
+
 func (c *Client) SignUp(ctx context.Context, email, password string) (*SignUpOutput, error) {
+	username := generateUUID()
 	input := &cip.SignUpInput{
 		ClientId:   aws.String(c.clientID),
-		Username:   aws.String(email),
+		Username:   aws.String(username),
 		Password:   aws.String(password),
-		SecretHash: aws.String(c.computeSecretHash(email)),
+		SecretHash: aws.String(c.computeSecretHash(username)),
 		UserAttributes: []types.AttributeType{
 			{Name: aws.String("email"), Value: aws.String(email)},
 		},
@@ -103,14 +114,35 @@ func (c *Client) SignUp(ctx context.Context, email, password string) (*SignUpOut
 }
 
 func (c *Client) ConfirmSignUp(ctx context.Context, email, code string) error {
+	username, err := c.findUsernameByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+
 	input := &cip.ConfirmSignUpInput{
 		ClientId:         aws.String(c.clientID),
-		Username:         aws.String(email),
+		Username:         aws.String(username),
 		ConfirmationCode: aws.String(code),
-		SecretHash:       aws.String(c.computeSecretHash(email)),
+		SecretHash:       aws.String(c.computeSecretHash(username)),
 	}
-	_, err := c.cip.ConfirmSignUp(ctx, input)
+	_, err = c.cip.ConfirmSignUp(ctx, input)
 	return err
+}
+
+func (c *Client) findUsernameByEmail(ctx context.Context, email string) (string, error) {
+	input := &cip.ListUsersInput{
+		UserPoolId: aws.String(c.poolID),
+		Filter:     aws.String(fmt.Sprintf("email = \"%s\"", email)),
+		Limit:      aws.Int32(1),
+	}
+	result, err := c.cip.ListUsers(ctx, input)
+	if err != nil {
+		return "", err
+	}
+	if len(result.Users) == 0 {
+		return "", fmt.Errorf("user not found for email: %s", email)
+	}
+	return aws.ToString(result.Users[0].Username), nil
 }
 
 func (c *Client) Login(ctx context.Context, email, password string) (*AuthTokens, error) {

@@ -94,3 +94,18 @@ resource "aws_iam_role_policy_attachment" "presignup_cognito" {
   role       = aws_iam_role.presignup.name
   policy_arn = aws_iam_policy.presignup_cognito.arn
 }
+
+# Custom Message trigger Lambda role
+resource "aws_iam_role" "custommessage" {
+  name               = "${var.project_name}-custommessage-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "custommessage_basic" {
+  role       = aws_iam_role.custommessage.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}

@@ -67,3 +67,29 @@ resource "aws_lambda_permission" "cognito_presignup" {
   principal     = "cognito-idp.amazonaws.com"
   source_arn    = aws_cognito_user_pool.main.arn
 }
+
+# Custom Message trigger Lambda
+resource "aws_lambda_function" "custommessage" {
+  function_name = "${var.project_name}-custommessage"
+  role          = aws_iam_role.custommessage.arn
+  handler       = "bootstrap"
+  runtime       = "provided.al2023"
+  architectures = ["arm64"]
+  timeout       = 5
+  memory_size   = 128
+
+  filename         = var.custommessage_zip_path
+  source_code_hash = filebase64sha256(var.custommessage_zip_path)
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_lambda_permission" "cognito_custommessage" {
+  statement_id  = "AllowCognitoInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.custommessage.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = aws_cognito_user_pool.main.arn
+}

@@ -56,6 +56,12 @@ variable "presignup_zip_path" {
   default     = "../presignup.zip"
 }
 
+variable "custommessage_zip_path" {
+  description = "Path to the Custom Message trigger Lambda deployment zip file"
+  type        = string
+  default     = "../custommessage.zip"
+}
+
 # OIDC Provider
 
 variable "oidc_signing_key" {
