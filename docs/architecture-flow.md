@@ -1,0 +1,67 @@
+# エンドポイント・ミドルウェア
+
+## フロー図
+
+```mermaid
+graph TB
+    subgraph "Endpoints"
+        direction TB
+        Health["/health<br/>Public"]
+        Discovery["/.well-known/openid-configuration<br/>/oidc/jwks.json<br/>Public"]
+
+        subgraph "OIDC Provider"
+            OIDCAuth["/oidc/authorize<br/>GET: Login page<br/>POST: Login submit"]
+            OIDCToken["/oidc/token<br/>Code → Token exchange"]
+            OIDCUserInfo["/oidc/userinfo<br/>Bearer Token → User claims"]
+        end
+
+        subgraph "Auth API (No Auth)"
+            Signup["POST /auth/signup<br/>→ Cognito SignUp"]
+            Confirm["POST /auth/confirm-signup<br/>→ Email verification"]
+            Login["POST /auth/login<br/>→ JWT tokens"]
+            Forgot["POST /auth/forgot-password<br/>→ Reset code"]
+            ConfirmReset["POST /auth/confirm-forgot-password<br/>→ New password"]
+            GoogleOAuth["GET /auth/oauth/google<br/>→ Redirect to Google"]
+            Callback["GET /auth/oauth/callback<br/>→ Token exchange / Link"]
+        end
+
+        subgraph "Protected API (JWT Required)"
+            Me["GET /api/me<br/>→ User info"]
+            Providers["GET /api/providers<br/>→ Linked providers"]
+            LinkGoogle["GET /api/link/google<br/>→ Google OAuth link"]
+            Unlink["DELETE /api/link/:provider<br/>→ Unlink provider"]
+        end
+
+        subgraph "Basic Auth Protected"
+            Pages["GET /pages/login<br/>GET /pages/signup<br/>GET /pages/dashboard"]
+            Admin["GET /admin/login<br/>POST /admin/login"]
+            subgraph "Admin (Cookie JWT + Admin Group)"
+                AdminUsers["/admin/users/*<br/>List, Create, Confirm,<br/>Reset, Enable, Disable, Delete"]
+            end
+        end
+    end
+
+    subgraph "Middleware Chain"
+        MW1["Security Headers<br/>HSTS, X-Frame-Options,<br/>X-Content-Type-Options"]
+        MW2["CORS<br/>vigorment.rikuka.dev"]
+        MW3["Basic Auth<br/>(UI routes only)"]
+        MW4["JWT Verify<br/>(Bearer token)"]
+        MW5["Admin Cookie Verify<br/>(cognito:groups = admin)"]
+    end
+
+    MW1 --> MW2
+    MW2 --> MW3
+    MW3 --> Pages
+    MW3 --> Admin
+    MW4 --> Me
+    MW4 --> Providers
+    MW4 --> LinkGoogle
+    MW4 --> Unlink
+    MW5 --> AdminUsers
+
+    style MW1 fill:#6366f1,color:#fff
+    style MW2 fill:#6366f1,color:#fff
+    style MW3 fill:#dc2626,color:#fff
+    style MW4 fill:#16a34a,color:#fff
+    style MW5 fill:#ea580c,color:#fff
+```

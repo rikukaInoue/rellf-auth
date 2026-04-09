@@ -1,0 +1,19 @@
+site_name: rellf-auth
+site_description: Cognito を内部に隠した独自 OIDC Provider
+
+nav:
+  - Home: index.md
+  - インフラ構成: architecture-infra.md
+  - エンドポイント・ミドルウェア: architecture-flow.md
+  - Cognito API リファレンス: cognito-api-reference.md
+  - アカウント統合: account-merge.md
+
+plugins:
+  - techdocs-core
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
