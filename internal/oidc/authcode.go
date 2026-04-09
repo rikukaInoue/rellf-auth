@@ -23,6 +23,8 @@ type AuthCodePayload struct {
 	CodeChallenge       string   `json:"cc,omitempty"`
 	CodeChallengeMethod string   `json:"ccm,omitempty"`
 	ExpiresAt           int64    `json:"exp"`
+	AuthTime            int64    `json:"auth_time,omitempty"`
+	AMR                 []string `json:"amr,omitempty"`
 }
 
 // AuthCodeCodec encodes/decodes stateless authorization codes using AES-GCM.

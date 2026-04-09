@@ -240,6 +240,8 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 			CodeChallenge:       codeChallenge,
 			CodeChallengeMethod: codeChallengeMethod,
 			ExpiresAt:           time.Now().Add(10 * time.Minute).Unix(),
+			AuthTime:            time.Now().Unix(),
+			AMR:                 []string{"pwd"},
 		}
 		token, err := h.codec.Encode(regPayload)
 		if err != nil {
@@ -253,7 +255,9 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		return
 	}
 
-	h.issueCodeAndRedirect(c, sub, emailClaim, groups, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod)
+	authTime := time.Now().Unix()
+	amr := []string{"pwd"}
+	h.issueCodeAndRedirect(c, sub, emailClaim, groups, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod, authTime, amr)
 }
 
 // RegisterEmail handles email registration for users without email (POST /oidc/register-email).
@@ -288,7 +292,7 @@ func (h *OIDCHandler) RegisterEmail(c *gin.Context) {
 	}
 
 	scope := strings.Join(payload.Scopes, " ")
-	h.issueCodeAndRedirect(c, payload.Sub, email, payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod)
+	h.issueCodeAndRedirect(c, payload.Sub, email, payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod, payload.AuthTime, payload.AMR)
 }
 
 // RegisterEmailSkip skips email registration (POST /oidc/register-email-skip).
@@ -302,10 +306,10 @@ func (h *OIDCHandler) RegisterEmailSkip(c *gin.Context) {
 	}
 
 	scope := strings.Join(payload.Scopes, " ")
-	h.issueCodeAndRedirect(c, payload.Sub, "", payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod)
+	h.issueCodeAndRedirect(c, payload.Sub, "", payload.Groups, payload.ClientID, payload.RedirectURI, scope, "", payload.Nonce, payload.CodeChallenge, payload.CodeChallengeMethod, payload.AuthTime, payload.AMR)
 }
 
-func (h *OIDCHandler) issueCodeAndRedirect(c *gin.Context, sub, email string, groups []string, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod string) {
+func (h *OIDCHandler) issueCodeAndRedirect(c *gin.Context, sub, email string, groups []string, clientID, redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod string, authTime int64, amr []string) {
 	scopes := strings.Split(scope, " ")
 
 	payload := &AuthCodePayload{
@@ -319,6 +323,8 @@ func (h *OIDCHandler) issueCodeAndRedirect(c *gin.Context, sub, email string, gr
 		CodeChallenge:       codeChallenge,
 		CodeChallengeMethod: codeChallengeMethod,
 		ExpiresAt:           time.Now().Add(5 * time.Minute).Unix(),
+		AuthTime:            authTime,
+		AMR:                 amr,
 	}
 
 	code, err := h.codec.Encode(payload)
@@ -390,7 +396,7 @@ func (h *OIDCHandler) Token(c *gin.Context) {
 	}
 
 	// Sign tokens
-	idToken, err := h.issuer.SignIDToken(payload.Sub, payload.Email, payload.Groups, clientID, payload.Nonce)
+	idToken, err := h.issuer.SignIDToken(payload.Sub, payload.Email, payload.Groups, clientID, payload.Nonce, payload.AuthTime, payload.AMR)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
 		return

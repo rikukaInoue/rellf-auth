@@ -96,7 +96,7 @@ func NewLocalTokenIssuer(issuer string) (*TokenIssuer, error) {
 }
 
 // SignIDToken creates a signed OIDC ID Token.
-func (ti *TokenIssuer) SignIDToken(sub, email string, groups []string, aud, nonce string) (string, error) {
+func (ti *TokenIssuer) SignIDToken(sub, email string, groups []string, aud, nonce string, authTime int64, amr []string) (string, error) {
 	now := time.Now()
 
 	builder := jwt.NewBuilder().
@@ -113,6 +113,12 @@ func (ti *TokenIssuer) SignIDToken(sub, email string, groups []string, aud, nonc
 	}
 	if len(groups) > 0 {
 		builder = builder.Claim("groups", groups)
+	}
+	if authTime > 0 {
+		builder = builder.Claim("auth_time", authTime)
+	}
+	if len(amr) > 0 {
+		builder = builder.Claim("amr", amr)
 	}
 
 	token, err := builder.Build()
