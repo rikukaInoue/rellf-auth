@@ -1,0 +1,74 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: rellf-auth
+  description: Cognito を内部に隠した独自 OIDC Provider。認証基盤。
+  annotations:
+    github.com/project-slug: rikukaInoue/rellf-auth
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - go
+    - aws
+    - cognito
+    - oidc
+    - lambda
+  links:
+    - url: https://auth.rikuka.dev
+      title: Production
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: guests
+  system: rellf
+  providesApis:
+    - rellf-auth-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: rellf-auth-api
+  description: rellf-auth の OIDC / 認証 API
+  tags:
+    - oidc
+    - rest
+spec:
+  type: openapi
+  lifecycle: production
+  owner: guests
+  system: rellf
+  definition: |
+    openapi: "3.0.0"
+    info:
+      title: rellf-auth API
+      version: "1.0"
+    servers:
+      - url: https://auth.rikuka.dev
+    paths:
+      /auth/signup:
+        post:
+          summary: ユーザー登録
+      /auth/confirm-signup:
+        post:
+          summary: サインアップ確認
+      /auth/login:
+        post:
+          summary: ログイン
+      /auth/forgot-password:
+        post:
+          summary: パスワードリセット要求
+      /.well-known/openid-configuration:
+        get:
+          summary: OIDC Discovery
+      /oidc/authorize:
+        get:
+          summary: OIDC 認可エンドポイント
+      /oidc/token:
+        post:
+          summary: OIDC トークンエンドポイント
+      /oidc/userinfo:
+        get:
+          summary: OIDC UserInfo エンドポイント
+      /oidc/jwks:
+        get:
+          summary: JWKS エンドポイント
