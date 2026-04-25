@@ -1,8 +1,7 @@
 services:
-  floci:
-    image: hectorvent/floci:latest
-    user: root
+  cognito:
+    image: jagregory/cognito-local:latest
     ports:
-      - "4566:4566"
+      - "9229:9229"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./.cognito:/app/.cognito

@@ -11,3 +11,4 @@ terraform/*.tfstate.backup
 terraform/*.tfvars
 !terraform/terraform.tfvars.example
 terraform/.terraform.lock.hcl
+.cognito/
