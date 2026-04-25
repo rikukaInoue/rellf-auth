@@ -1,0 +1,15 @@
+# Context Essentials
+# コンパクション後に自動再注入される情報
+# プロジェクトごとに .claude/context-essentials.txt として配置する
+
+## Current Task
+- TODO: 現在のタスクを記述する
+
+## Completed
+- TODO: 完了済みの作業を記述する
+
+## Next Steps
+- TODO: 次にやることを記述する
+
+## Important Decisions
+- TODO: セッション中に決めた重要な設計判断を記述する
