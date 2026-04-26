@@ -180,6 +180,14 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		emailClaim, _ = v.(string)
 	}
 
+	// Extract cognito:username (internal UUID, may differ from sub)
+	cognitoUsername := sub
+	if v, ok := idToken.Get("cognito:username"); ok {
+		if s, ok := v.(string); ok && s != "" {
+			cognitoUsername = s
+		}
+	}
+
 	// Extract groups
 	var groups []string
 	if v, ok := idToken.Get("cognito:groups"); ok {
@@ -193,7 +201,7 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 	}
 
 	// Validate user lifecycle state via domain model
-	_, validateErr := h.userUC.ValidateLoginState(c.Request.Context(), sub)
+	_, validateErr := h.userUC.ValidateLoginState(c.Request.Context(), cognitoUsername)
 	if validateErr != nil {
 		errorMsg := "ログインできません。管理者にお問い合わせください。"
 		if user, _ := h.userUC.GetUser(c.Request.Context(), sub); user != nil {
@@ -223,7 +231,7 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 	}
 
 	// Record login
-	h.userUC.RecordLogin(c.Request.Context(), sub)
+	h.userUC.RecordLogin(c.Request.Context(), cognitoUsername)
 
 	scopes := strings.Split(scope, " ")
 
