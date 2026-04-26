@@ -146,13 +146,20 @@ func (c *Client) findUsernameByEmail(ctx context.Context, email string) (string,
 }
 
 func (c *Client) Login(ctx context.Context, email, password string) (*AuthTokens, error) {
+	// Resolve email alias to Cognito username (UUID) for SECRET_HASH computation.
+	// Cognito validates SECRET_HASH against the internal username, not the email alias.
+	username := email
+	if resolved, err := c.findUsernameByEmail(ctx, email); err == nil && resolved != "" {
+		username = resolved
+	}
+
 	input := &cip.InitiateAuthInput{
 		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
 		ClientId: aws.String(c.clientID),
 		AuthParameters: map[string]string{
 			"USERNAME":    email,
 			"PASSWORD":    password,
-			"SECRET_HASH": c.computeSecretHash(email),
+			"SECRET_HASH": c.computeSecretHash(username),
 		},
 	}
 
