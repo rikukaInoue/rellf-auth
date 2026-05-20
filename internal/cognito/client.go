@@ -14,6 +14,7 @@ import (
 	cip "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 	"github.com/inouetaishi/rellf-auth/internal/config"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 )
 
 type AuthTokens struct {
@@ -24,25 +25,15 @@ type AuthTokens struct {
 	TokenType    string `json:"token_type"`
 }
 
-type SignUpOutput struct {
-	UserConfirmed bool   `json:"user_confirmed"`
-	UserSub       string `json:"user_sub"`
-}
-
-type LinkedProvider struct {
-	ProviderName string `json:"provider_name"`
-	ProviderUID  string `json:"provider_uid"`
-}
-
 type Service interface {
-	SignUp(ctx context.Context, email, password string) (*SignUpOutput, error)
+	SignUp(ctx context.Context, email, password string) (*domain.SignUpResult, error)
 	ConfirmSignUp(ctx context.Context, email, code string) error
 	Login(ctx context.Context, email, password string) (*AuthTokens, error)
 	ForgotPassword(ctx context.Context, email string) error
 	ConfirmForgotPassword(ctx context.Context, email, code, newPassword string) error
 	LinkProvider(ctx context.Context, username, providerName, providerUID string) error
 	UnlinkProvider(ctx context.Context, username, providerName, providerUID string) error
-	GetLinkedProviders(ctx context.Context, username string) ([]LinkedProvider, error)
+	GetLinkedProviders(ctx context.Context, username string) ([]domain.LinkedProvider, error)
 }
 
 type Client struct {
@@ -90,7 +81,7 @@ func generateUUID() string {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
-func (c *Client) SignUp(ctx context.Context, email, password string) (*SignUpOutput, error) {
+func (c *Client) SignUp(ctx context.Context, email, password string) (*domain.SignUpResult, error) {
 	username := generateUUID()
 	input := &cip.SignUpInput{
 		ClientId:   aws.String(c.clientID),
@@ -107,7 +98,7 @@ func (c *Client) SignUp(ctx context.Context, email, password string) (*SignUpOut
 		return nil, err
 	}
 
-	return &SignUpOutput{
+	return &domain.SignUpResult{
 		UserConfirmed: result.UserConfirmed,
 		UserSub:       aws.ToString(result.UserSub),
 	}, nil
@@ -232,7 +223,7 @@ func (c *Client) UnlinkProvider(ctx context.Context, username, providerName, pro
 	return err
 }
 
-func (c *Client) GetLinkedProviders(ctx context.Context, username string) ([]LinkedProvider, error) {
+func (c *Client) GetLinkedProviders(ctx context.Context, username string) ([]domain.LinkedProvider, error) {
 	input := &cip.AdminGetUserInput{
 		UserPoolId: aws.String(c.poolID),
 		Username:   aws.String(username),
@@ -243,10 +234,10 @@ func (c *Client) GetLinkedProviders(ctx context.Context, username string) ([]Lin
 		return nil, err
 	}
 
-	var providers []LinkedProvider
+	var providers []domain.LinkedProvider
 
 	// The native Cognito account itself
-	providers = append(providers, LinkedProvider{
+	providers = append(providers, domain.LinkedProvider{
 		ProviderName: "Cognito",
 		ProviderUID:  aws.ToString(result.Username),
 	})
@@ -261,7 +252,7 @@ func (c *Client) GetLinkedProviders(ctx context.Context, username string) ([]Lin
 			}
 			if err := json.Unmarshal([]byte(aws.ToString(attr.Value)), &identities); err == nil {
 				for _, id := range identities {
-					providers = append(providers, LinkedProvider{
+					providers = append(providers, domain.LinkedProvider{
 						ProviderName: id.ProviderName,
 						ProviderUID:  id.UserID,
 					})

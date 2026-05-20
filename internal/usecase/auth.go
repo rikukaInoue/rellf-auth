@@ -5,14 +5,9 @@ import (
 	"fmt"
 
 	"github.com/lestrrat-go/jwx/v2/jwt"
-)
 
-type AuthenticatedUser struct {
-	Sub      string
-	Email    string
-	Username string
-	Groups   []string
-}
+	"github.com/inouetaishi/rellf-auth/internal/domain"
+)
 
 type CredentialVerifier interface {
 	LoginIDToken(ctx context.Context, email, password string) (idTokenRaw string, err error)
@@ -26,7 +21,7 @@ func NewAuthUseCase(verifier CredentialVerifier) *AuthUseCase {
 	return &AuthUseCase{verifier: verifier}
 }
 
-func (uc *AuthUseCase) Authenticate(ctx context.Context, email, password string) (*AuthenticatedUser, error) {
+func (uc *AuthUseCase) Authenticate(ctx context.Context, email, password string) (*domain.AuthenticatedUser, error) {
 	idTokenRaw, err := uc.verifier.LoginIDToken(ctx, email, password)
 	if err != nil {
 		return nil, err
@@ -35,7 +30,7 @@ func (uc *AuthUseCase) Authenticate(ctx context.Context, email, password string)
 	return uc.parseIdentity(idTokenRaw)
 }
 
-func (uc *AuthUseCase) parseIdentity(idTokenRaw string) (*AuthenticatedUser, error) {
+func (uc *AuthUseCase) parseIdentity(idTokenRaw string) (*domain.AuthenticatedUser, error) {
 	idToken, err := jwt.Parse([]byte(idTokenRaw), jwt.WithVerify(false), jwt.WithValidate(false))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ID token: %w", err)
@@ -66,7 +61,7 @@ func (uc *AuthUseCase) parseIdentity(idTokenRaw string) (*AuthenticatedUser, err
 		}
 	}
 
-	return &AuthenticatedUser{
+	return &domain.AuthenticatedUser{
 		Sub:      sub,
 		Email:    email,
 		Username: username,
