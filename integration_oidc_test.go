@@ -20,6 +20,7 @@ import (
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/router"
+	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 func setupOIDCTestServer(t *testing.T) *httptest.Server {
@@ -35,12 +36,12 @@ func setupOIDCTestServer(t *testing.T) *httptest.Server {
 		t.Fatalf("failed to create cognito client: %v", err)
 	}
 
-	jwtMw := middleware.NewLocalJWTMiddleware(cfg.CognitoClientID)
-
 	tokenIssuer, err := oidc.NewLocalTokenIssuer(cfg.OIDCIssuer)
 	if err != nil {
 		t.Fatalf("failed to create local token issuer: %v", err)
 	}
+
+	jwtMw := middleware.NewLocalJWTMiddleware(tokenIssuer.JWKS(), cfg.OIDCIssuer, cfg.CognitoClientID)
 
 	authCodeCodec, err := oidc.NewAuthCodeCodec(cfg.OIDCAuthCodeKey)
 	if err != nil {
@@ -52,10 +53,12 @@ func setupOIDCTestServer(t *testing.T) *httptest.Server {
 		t.Fatalf("failed to parse OIDC clients: %v", err)
 	}
 	clientRegistry := oidc.NewClientRegistry(oidcClients)
-	oidcH := oidc.NewOIDCHandler(cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
 
-	h := handler.New(cognitoClient, cfg)
-	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
+	authUC := usecase.NewAuthUseCase(cognitoClient)
+	userUC := usecase.NewUserUseCase(cognitoClient)
+	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, clientRegistry, cfg)
+	h := handler.New(cognitoClient, authUC, tokenIssuer, cfg)
+	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 
 	return httptest.NewServer(r)
