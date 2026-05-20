@@ -63,9 +63,9 @@ func init() {
 	}
 	clientRegistry := oidc.NewClientRegistry(oidcClients)
 
-	oidcH := oidc.NewOIDCHandler(cognitoClient, cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
-
 	authUC := usecase.NewAuthUseCase(cognitoClient)
+	userUC := usecase.NewUserUseCase(cognitoClient)
+	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, clientRegistry, cfg)
 	h := handler.New(cognitoClient, authUC, tokenIssuer, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)

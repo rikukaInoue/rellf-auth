@@ -13,7 +13,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 
-	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/inouetaishi/rellf-auth/internal/usecase"
@@ -21,7 +20,7 @@ import (
 
 // OIDCHandler handles all OIDC Provider endpoints.
 type OIDCHandler struct {
-	cognito   cognito.Service
+	authUC    *usecase.AuthUseCase
 	userUC    *usecase.UserUseCase
 	issuer    *TokenIssuer
 	codec     *AuthCodeCodec
@@ -33,16 +32,16 @@ type OIDCHandler struct {
 
 // NewOIDCHandler creates a new OIDCHandler.
 func NewOIDCHandler(
-	cognitoSvc cognito.Service,
-	adminSvc cognito.AdminService,
+	authUC *usecase.AuthUseCase,
+	userUC *usecase.UserUseCase,
 	issuer *TokenIssuer,
 	codec *AuthCodeCodec,
 	clients *ClientRegistry,
 	cfg *config.Config,
 ) *OIDCHandler {
 	return &OIDCHandler{
-		cognito:   cognitoSvc,
-		userUC:    usecase.NewUserUseCase(adminSvc),
+		authUC:    authUC,
+		userUC:    userUC,
 		issuer:    issuer,
 		codec:     codec,
 		clients:   clients,
@@ -146,8 +145,7 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		return
 	}
 
-	// Authenticate via Cognito
-	tokens, err := h.cognito.Login(c.Request.Context(), email, password)
+	user, err := h.authUC.Authenticate(c.Request.Context(), email, password)
 	if err != nil {
 		data := loginPageData{
 			ClientID:            clientID,
@@ -167,38 +165,10 @@ func (h *OIDCHandler) AuthorizeSubmit(c *gin.Context) {
 		return
 	}
 
-	// Extract sub and email from Cognito ID token (trusted, no sig verification needed)
-	idToken, err := jwt.Parse([]byte(tokens.IDToken), jwt.WithVerify(false), jwt.WithValidate(false))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error", "error_description": "failed to parse ID token"})
-		return
-	}
-
-	sub := idToken.Subject()
-	emailClaim := ""
-	if v, ok := idToken.Get("email"); ok {
-		emailClaim, _ = v.(string)
-	}
-
-	// Extract cognito:username (internal UUID, may differ from sub)
-	cognitoUsername := sub
-	if v, ok := idToken.Get("cognito:username"); ok {
-		if s, ok := v.(string); ok && s != "" {
-			cognitoUsername = s
-		}
-	}
-
-	// Extract groups
-	var groups []string
-	if v, ok := idToken.Get("cognito:groups"); ok {
-		if gs, ok := v.([]interface{}); ok {
-			for _, g := range gs {
-				if s, ok := g.(string); ok {
-					groups = append(groups, s)
-				}
-			}
-		}
-	}
+	sub := user.Sub
+	emailClaim := user.Email
+	cognitoUsername := user.Username
+	groups := user.Groups
 
 	// Validate user lifecycle state via domain model
 	_, validateErr := h.userUC.ValidateLoginState(c.Request.Context(), cognitoUsername)
