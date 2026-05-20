@@ -1,9 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -36,67 +34,6 @@ func (h *Handler) LinkGoogle(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, gin.H{"redirect_url": authURL})
-}
-
-// handleLinkCallback handles the OAuth callback when linking a provider to an existing account.
-func (h *Handler) handleLinkCallback(c *gin.Context, code, username string) {
-	// Exchange code for tokens to get the external user's identity
-	tokenURL := fmt.Sprintf("https://%s/oauth2/token", h.cfg.CognitoDomain)
-
-	data := url.Values{}
-	data.Set("grant_type", "authorization_code")
-	data.Set("client_id", h.cfg.CognitoClientID)
-	data.Set("client_secret", h.cfg.CognitoClientSecret)
-	data.Set("code", code)
-	data.Set("redirect_uri", h.cfg.OAuthCallbackURL)
-
-	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "token exchange failed", err.Error())
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "failed to read token response", err.Error())
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		errorResponse(c, http.StatusBadRequest, "token exchange failed", string(body))
-		return
-	}
-
-	var tokenResp struct {
-		IDToken string `json:"id_token"`
-	}
-	if err := json.Unmarshal(body, &tokenResp); err != nil {
-		errorResponse(c, http.StatusInternalServerError, "failed to parse token response", err.Error())
-		return
-	}
-
-	// Parse the ID token to get the Google sub (no signature verification needed here
-	// since we got it directly from Cognito's token endpoint over HTTPS)
-	idToken, err := jwt.Parse([]byte(tokenResp.IDToken), jwt.WithVerify(false))
-	if err != nil {
-		errorResponse(c, http.StatusInternalServerError, "failed to parse id token", err.Error())
-		return
-	}
-
-	googleSub := idToken.Subject()
-	if googleSub == "" {
-		errorResponse(c, http.StatusInternalServerError, "missing sub in id token", "")
-		return
-	}
-
-	// Link the Google identity to the existing user
-	if err := h.auth.LinkProvider(c.Request.Context(), username, "Google", googleSub); err != nil {
-		errorResponse(c, http.StatusInternalServerError, "failed to link provider", err.Error())
-		return
-	}
-
-	c.Redirect(http.StatusFound, "/pages/dashboard")
 }
 
 // UnlinkProvider godoc

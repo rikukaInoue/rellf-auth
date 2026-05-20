@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 func generateState() (string, error) {
@@ -69,6 +70,55 @@ func (h *Handler) OAuthCallback(c *gin.Context) {
 		return
 	}
 
+	cognitoIDToken, err := h.exchangeCognitoCode(c, code)
+	if err != nil {
+		return
+	}
+
+	idToken, err := jwt.Parse([]byte(cognitoIDToken), jwt.WithVerify(false), jwt.WithValidate(false))
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "failed to parse id token", err.Error())
+		return
+	}
+
+	sub := idToken.Subject()
+	var email string
+	if v, ok := idToken.Get("email"); ok {
+		email, _ = v.(string)
+	}
+	var groups []string
+	if v, ok := idToken.Get("cognito:groups"); ok {
+		if gs, ok := v.([]interface{}); ok {
+			for _, g := range gs {
+				if s, ok := g.(string); ok {
+					groups = append(groups, s)
+				}
+			}
+		}
+	}
+
+	selfIDToken, err := h.issuer.SignIDToken(sub, email, groups, h.cfg.CognitoClientID, "", 0, []string{"federated"})
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
+		return
+	}
+
+	selfAccessToken, err := h.issuer.SignAccessToken(sub, []string{"openid", "email", "profile"}, h.cfg.CognitoClientID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
+		return
+	}
+
+	redirect := fmt.Sprintf("/pages/dashboard#access_token=%s&id_token=%s",
+		url.QueryEscape(selfAccessToken),
+		url.QueryEscape(selfIDToken),
+	)
+	c.Redirect(http.StatusFound, redirect)
+}
+
+// exchangeCognitoCode exchanges an OAuth authorization code for Cognito tokens
+// and returns the raw ID token string. On error, it writes the HTTP error response.
+func (h *Handler) exchangeCognitoCode(c *gin.Context, code string) (string, error) {
 	tokenURL := fmt.Sprintf("https://%s/oauth2/token", h.cfg.CognitoDomain)
 
 	data := url.Values{}
@@ -81,38 +131,57 @@ func (h *Handler) OAuthCallback(c *gin.Context) {
 	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "token exchange failed", err.Error())
-		return
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to read token response", err.Error())
-		return
+		return "", err
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		errorResponse(c, http.StatusBadRequest, "token exchange failed", string(body))
-		return
+		return "", fmt.Errorf("token exchange failed: %s", string(body))
 	}
 
-	var tokens struct {
-		AccessToken  string `json:"access_token"`
-		IDToken      string `json:"id_token"`
-		RefreshToken string `json:"refresh_token"`
+	var tokenResp struct {
+		IDToken string `json:"id_token"`
 	}
-	if err := json.Unmarshal(body, &tokens); err != nil {
+	if err := json.Unmarshal(body, &tokenResp); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to parse token response", err.Error())
+		return "", err
+	}
+
+	return tokenResp.IDToken, nil
+}
+
+// handleLinkCallback handles the OAuth callback when linking a provider to an existing account.
+func (h *Handler) handleLinkCallback(c *gin.Context, code, username string) {
+	cognitoIDToken, err := h.exchangeCognitoCode(c, code)
+	if err != nil {
 		return
 	}
 
-	// Redirect to dashboard with tokens as fragment (not sent to server)
-	redirect := fmt.Sprintf("/pages/dashboard#access_token=%s&id_token=%s&refresh_token=%s",
-		url.QueryEscape(tokens.AccessToken),
-		url.QueryEscape(tokens.IDToken),
-		url.QueryEscape(tokens.RefreshToken),
-	)
-	c.Redirect(http.StatusFound, redirect)
+	idToken, err := jwt.Parse([]byte(cognitoIDToken), jwt.WithVerify(false))
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "failed to parse id token", err.Error())
+		return
+	}
+
+	googleSub := idToken.Subject()
+	if googleSub == "" {
+		errorResponse(c, http.StatusInternalServerError, "missing sub in id token", "")
+		return
+	}
+
+	if err := h.auth.LinkProvider(c.Request.Context(), username, "Google", googleSub); err != nil {
+		errorResponse(c, http.StatusInternalServerError, "failed to link provider", err.Error())
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/pages/dashboard")
 }
 
 // Me godoc
