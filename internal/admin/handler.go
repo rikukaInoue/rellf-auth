@@ -8,22 +8,25 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
+	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 type AdminHandler struct {
 	auth      cognito.AdminService
-	loginAuth cognito.Service
+	authUC    *usecase.AuthUseCase
+	issuer    *oidc.TokenIssuer
 	userUC    *usecase.UserUseCase
 	cfg       *config.Config
 	templates *template.Template
 	staticFS  fs.FS
 }
 
-func NewAdminHandler(auth cognito.AdminService, loginAuth cognito.Service, cfg *config.Config) *AdminHandler {
+func NewAdminHandler(auth cognito.AdminService, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *AdminHandler {
 	return &AdminHandler{
 		auth:      auth,
-		loginAuth: loginAuth,
+		authUC:    authUC,
+		issuer:    issuer,
 		userUC:    usecase.NewUserUseCase(auth),
 		cfg:       cfg,
 		templates: parseTemplates(),
@@ -45,15 +48,21 @@ func (h *AdminHandler) LoginSubmit(c *gin.Context) {
 	email := c.PostForm("email")
 	password := c.PostForm("password")
 
-	tokens, err := h.loginAuth.Login(c.Request.Context(), email, password)
+	user, err := h.authUC.Authenticate(c.Request.Context(), email, password)
 	if err != nil {
 		h.templates.ExecuteTemplate(c.Writer, "login", gin.H{"Error": "Invalid email or password"})
 		return
 	}
 
+	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{"pwd"})
+	if err != nil {
+		h.templates.ExecuteTemplate(c.Writer, "login", gin.H{"Error": "Token signing failed"})
+		return
+	}
+
 	secure := !h.cfg.IsLocal()
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("admin_token", tokens.IDToken, 3600, "/admin", "", secure, true)
+	c.SetCookie("admin_token", idToken, 3600, "/admin", "", secure, true)
 	c.Redirect(http.StatusSeeOther, "/admin/users")
 }
 

@@ -67,7 +67,7 @@ func init() {
 
 	authUC := usecase.NewAuthUseCase(cognitoClient)
 	h := handler.New(cognitoClient, authUC, tokenIssuer, cfg)
-	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
+	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 	ginLambda = ginadapter.NewV2(r)
 }
