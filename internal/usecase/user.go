@@ -4,20 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/domain"
 )
 
 type UserUseCase struct {
-	admin cognito.AdminService
+	repo UserRepository
 }
 
-func NewUserUseCase(admin cognito.AdminService) *UserUseCase {
-	return &UserUseCase{admin: admin}
+func NewUserUseCase(repo UserRepository) *UserUseCase {
+	return &UserUseCase{repo: repo}
 }
 
 func (uc *UserUseCase) GetUser(ctx context.Context, username string) (domain.User, error) {
-	detail, err := uc.admin.AdminGetUser(ctx, username)
+	detail, err := uc.repo.GetUser(ctx, username)
 	if err != nil {
 		return nil, fmt.Errorf("get user failed: %w", err)
 	}
@@ -25,7 +24,7 @@ func (uc *UserUseCase) GetUser(ctx context.Context, username string) (domain.Use
 }
 
 func (uc *UserUseCase) ListUsers(ctx context.Context, filter string, limit int32, token *string) ([]domain.User, *string, error) {
-	result, err := uc.admin.AdminListUsers(ctx, filter, limit, token)
+	result, err := uc.repo.ListUsers(ctx, filter, limit, token)
 	if err != nil {
 		return nil, nil, fmt.Errorf("list users failed: %w", err)
 	}
@@ -49,8 +48,8 @@ func (uc *UserUseCase) ConfirmUser(ctx context.Context, username, actor string) 
 		return nil, nil, fmt.Errorf("cannot confirm: user is %s", user.UserStatus())
 	}
 
-	if err := uc.admin.AdminConfirmSignUp(ctx, username); err != nil {
-		return nil, nil, fmt.Errorf("cognito confirm failed: %w", err)
+	if err := uc.repo.ConfirmUser(ctx, username); err != nil {
+		return nil, nil, fmt.Errorf("confirm failed: %w", err)
 	}
 
 	active := pending.Confirm()
@@ -70,8 +69,8 @@ func (uc *UserUseCase) SuspendUser(ctx context.Context, username, reason, actor 
 		return nil, nil, fmt.Errorf("cannot suspend: user is %s", user.UserStatus())
 	}
 
-	if err := uc.admin.AdminDisableUser(ctx, username); err != nil {
-		return nil, nil, fmt.Errorf("cognito disable failed: %w", err)
+	if err := uc.repo.DisableUser(ctx, username); err != nil {
+		return nil, nil, fmt.Errorf("disable failed: %w", err)
 	}
 
 	suspended := active.Suspend(reason)
@@ -91,8 +90,8 @@ func (uc *UserUseCase) ReactivateUser(ctx context.Context, username, actor strin
 		return nil, nil, fmt.Errorf("cannot reactivate: user is %s", user.UserStatus())
 	}
 
-	if err := uc.admin.AdminEnableUser(ctx, username); err != nil {
-		return nil, nil, fmt.Errorf("cognito enable failed: %w", err)
+	if err := uc.repo.EnableUser(ctx, username); err != nil {
+		return nil, nil, fmt.Errorf("enable failed: %w", err)
 	}
 
 	active := suspended.Reactivate()
@@ -118,8 +117,8 @@ func (uc *UserUseCase) DeleteUser(ctx context.Context, username, reason, actor s
 		return nil, nil, fmt.Errorf("cannot delete: user is %s", user.UserStatus())
 	}
 
-	if err := uc.admin.AdminDeleteUser(ctx, username); err != nil {
-		return nil, nil, fmt.Errorf("cognito delete failed: %w", err)
+	if err := uc.repo.DeleteUser(ctx, username); err != nil {
+		return nil, nil, fmt.Errorf("delete failed: %w", err)
 	}
 
 	event := domain.NewAuditEvent(username, domain.AuditDelete, actor, reason)
@@ -181,8 +180,8 @@ func (uc *UserUseCase) ResetPassword(ctx context.Context, username, actor string
 		return nil, fmt.Errorf("cannot reset password: user is %s", user.UserStatus())
 	}
 
-	if err := uc.admin.AdminResetPassword(ctx, username); err != nil {
-		return nil, fmt.Errorf("cognito reset password failed: %w", err)
+	if err := uc.repo.ResetPassword(ctx, username); err != nil {
+		return nil, fmt.Errorf("reset password failed: %w", err)
 	}
 
 	event := domain.NewAuditEvent(username, domain.AuditPasswordReset, actor, "")
@@ -204,9 +203,6 @@ func (uc *UserUseCase) RegisterEmail(ctx context.Context, username, email, actor
 	if active.Email != "" {
 		return nil, nil, fmt.Errorf("user already has email: %s", active.Email)
 	}
-
-	// TODO: Call Cognito AdminUpdateUserAttributes to set email
-	// TODO: Trigger email verification
 
 	active.Email = email
 	event := domain.NewAuditEvent(username, domain.AuditConfirm, actor, "email registered: "+email)
@@ -251,15 +247,15 @@ func (uc *UserUseCase) ValidateLoginState(ctx context.Context, username string) 
 	}
 }
 
-func toDomainUser(d *cognito.AdminUserDetail) domain.User {
-	status := mapCognitoStatus(d.Status, d.Enabled)
+func toDomainUser(d *UserDetail) domain.User {
+	status := mapStatus(d.Status, d.Enabled)
 
 	var groups []string
 	if g, ok := d.Attributes["cognito:groups"]; ok && g != "" {
 		groups = []string{g}
 	}
 
-	u, err := domain.FromCognito(
+	u, err := domain.FromStore(
 		d.Username,
 		d.Email,
 		string(status),
@@ -278,10 +274,10 @@ func toDomainUser(d *cognito.AdminUserDetail) domain.User {
 	return u
 }
 
-func summaryToDomainUser(s cognito.AdminUserSummary) domain.User {
-	status := mapCognitoStatus(s.Status, s.Enabled)
+func summaryToDomainUser(s UserSummary) domain.User {
+	status := mapStatus(s.Status, s.Enabled)
 
-	u, _ := domain.FromCognito(
+	u, _ := domain.FromStore(
 		s.Username,
 		s.Email,
 		string(status),
@@ -293,9 +289,9 @@ func summaryToDomainUser(s cognito.AdminUserSummary) domain.User {
 	return u
 }
 
-func mapCognitoStatus(cognitoStatus string, enabled bool) domain.UserStatus {
+func mapStatus(storeStatus string, enabled bool) domain.UserStatus {
 	switch {
-	case cognitoStatus == "UNCONFIRMED":
+	case storeStatus == "UNCONFIRMED":
 		return domain.StatusPending
 	case !enabled:
 		return domain.StatusSuspended

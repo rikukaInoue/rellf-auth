@@ -6,14 +6,13 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 type AdminHandler struct {
-	auth      cognito.AdminService
+	repo      usecase.UserRepository
 	authUC    *usecase.AuthUseCase
 	issuer    *oidc.TokenIssuer
 	userUC    *usecase.UserUseCase
@@ -22,12 +21,12 @@ type AdminHandler struct {
 	staticFS  fs.FS
 }
 
-func NewAdminHandler(auth cognito.AdminService, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *AdminHandler {
+func NewAdminHandler(repo usecase.UserRepository, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *AdminHandler {
 	return &AdminHandler{
-		auth:      auth,
+		repo:      repo,
 		authUC:    authUC,
 		issuer:    issuer,
-		userUC:    usecase.NewUserUseCase(auth),
+		userUC:    usecase.NewUserUseCase(repo),
 		cfg:       cfg,
 		templates: parseTemplates(),
 		staticFS:  staticSubFS(),
@@ -89,7 +88,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		paginationToken = &nextToken
 	}
 
-	result, err := h.auth.AdminListUsers(c.Request.Context(), filter, 20, paginationToken)
+	result, err := h.repo.ListUsers(c.Request.Context(), filter, 20, paginationToken)
 	if err != nil {
 		h.renderError(c, "Failed to list users: "+err.Error())
 		return
@@ -110,7 +109,7 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 func (h *AdminHandler) UserDetail(c *gin.Context) {
 	username := c.Param("username")
 
-	user, err := h.auth.AdminGetUser(c.Request.Context(), username)
+	user, err := h.repo.GetUser(c.Request.Context(), username)
 	if err != nil {
 		h.setFlash(c, "error", "User not found: "+err.Error())
 		c.Redirect(http.StatusSeeOther, "/admin/users")
@@ -130,7 +129,7 @@ func (h *AdminHandler) CreateUserSubmit(c *gin.Context) {
 	email := c.PostForm("email")
 	tempPassword := c.PostForm("temp_password")
 
-	user, err := h.auth.AdminCreateUser(c.Request.Context(), email, tempPassword)
+	user, err := h.repo.CreateUser(c.Request.Context(), email, tempPassword)
 	if err != nil {
 		h.setFlash(c, "error", "Failed to create user: "+err.Error())
 		c.Redirect(http.StatusSeeOther, "/admin/users/new")

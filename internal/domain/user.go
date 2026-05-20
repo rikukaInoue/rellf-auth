@@ -143,8 +143,8 @@ func (u *DeletedUser) UserEmail() string       { return u.Email }
 func (u *DeletedUser) UserStatus() UserStatus  { return StatusDeleted }
 func (u *DeletedUser) UserCreatedAt() time.Time { return u.CreatedAt }
 
-// FromCognito reconstructs the appropriate User type from Cognito data.
-func FromCognito(id, email, status string, groups []string, createdAt time.Time, suspendedAt *time.Time, suspendReason string) (User, error) {
+// FromStore reconstructs the appropriate User type from Cognito data.
+func FromStore(id, email, status string, groups []string, createdAt time.Time, suspendedAt *time.Time, suspendReason string) (User, error) {
 	switch UserStatus(status) {
 	case StatusPending:
 		return &PendingUser{

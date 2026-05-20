@@ -97,7 +97,7 @@ func TestDeletedUser_IsTerminal(t *testing.T) {
 	}
 }
 
-func TestFromCognito(t *testing.T) {
+func TestFromStore(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
@@ -111,7 +111,7 @@ func TestFromCognito(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		u, err := FromCognito("id", "email", tt.status, nil, now, nil, "")
+		u, err := FromStore("id", "email", tt.status, nil, now, nil, "")
 		if err != nil {
 			t.Errorf("unexpected error for %s: %v", tt.status, err)
 		}
@@ -120,7 +120,7 @@ func TestFromCognito(t *testing.T) {
 		}
 	}
 
-	_, err := FromCognito("id", "email", "unknown", nil, now, nil, "")
+	_, err := FromStore("id", "email", "unknown", nil, now, nil, "")
 	if err == nil {
 		t.Error("expected error for unknown status")
 	}
