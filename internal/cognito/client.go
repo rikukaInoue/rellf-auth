@@ -145,6 +145,16 @@ func (c *Client) findUsernameByEmail(ctx context.Context, email string) (string,
 	return aws.ToString(result.Users[0].Username), nil
 }
 
+// LoginIDToken authenticates and returns the raw ID token string.
+// Satisfies usecase.CredentialVerifier implicitly.
+func (c *Client) LoginIDToken(ctx context.Context, email, password string) (string, error) {
+	tokens, err := c.Login(ctx, email, password)
+	if err != nil {
+		return "", err
+	}
+	return tokens.IDToken, nil
+}
+
 func (c *Client) Login(ctx context.Context, email, password string) (*AuthTokens, error) {
 	input := &cip.InitiateAuthInput{
 		AuthFlow: types.AuthFlowTypeUserPasswordAuth,
