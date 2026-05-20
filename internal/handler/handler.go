@@ -4,21 +4,21 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 type Handler struct {
-	auth    cognito.Service
-	authUC  *usecase.AuthUseCase
-	issuer  *oidc.TokenIssuer
-	cfg     *config.Config
+	creds    usecase.CredentialStore
+	providers usecase.ProviderStore
+	authUC   *usecase.AuthUseCase
+	issuer   *oidc.TokenIssuer
+	cfg      *config.Config
 }
 
-func New(auth cognito.Service, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *Handler {
-	return &Handler{auth: auth, authUC: authUC, issuer: issuer, cfg: cfg}
+func New(creds usecase.CredentialStore, providers usecase.ProviderStore, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *Handler {
+	return &Handler{creds: creds, providers: providers, authUC: authUC, issuer: issuer, cfg: cfg}
 }
 
 type ErrorResponse struct {

@@ -57,7 +57,7 @@ func setupOIDCTestServer(t *testing.T) *httptest.Server {
 	authUC := usecase.NewAuthUseCase(cognitoClient)
 	userUC := usecase.NewUserUseCase(cognitoClient)
 	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, clientRegistry, cfg)
-	h := handler.New(cognitoClient, authUC, tokenIssuer, cfg)
+	h := handler.New(cognitoClient, cognitoClient, authUC, tokenIssuer, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 

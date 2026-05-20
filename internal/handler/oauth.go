@@ -176,7 +176,7 @@ func (h *Handler) handleLinkCallback(c *gin.Context, code, username string) {
 		return
 	}
 
-	if err := h.auth.LinkProvider(c.Request.Context(), username, "Google", googleSub); err != nil {
+	if err := h.providers.LinkProvider(c.Request.Context(), username, "Google", googleSub); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to link provider", err.Error())
 		return
 	}

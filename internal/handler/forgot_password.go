@@ -27,7 +27,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.ForgotPassword(c.Request.Context(), req.Email); err != nil {
+	if err := h.creds.ForgotPassword(c.Request.Context(), req.Email); err != nil {
 		errorResponse(c, http.StatusBadRequest, "forgot password failed", err.Error())
 		return
 	}
@@ -58,7 +58,7 @@ func (h *Handler) ConfirmForgotPassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.ConfirmForgotPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+	if err := h.creds.ConfirmForgotPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
 		errorResponse(c, http.StatusBadRequest, "password reset failed", err.Error())
 		return
 	}

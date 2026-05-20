@@ -67,7 +67,7 @@ func (h *Handler) UnlinkProvider(c *gin.Context) {
 	username := jwtToken.Subject()
 
 	// Get current linked providers to find the UID
-	providers, err := h.auth.GetLinkedProviders(c.Request.Context(), username)
+	providers, err := h.providers.GetLinkedProviders(c.Request.Context(), username)
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to get linked providers", err.Error())
 		return
@@ -86,7 +86,7 @@ func (h *Handler) UnlinkProvider(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.UnlinkProvider(c.Request.Context(), username, providerName, providerUID); err != nil {
+	if err := h.providers.UnlinkProvider(c.Request.Context(), username, providerName, providerUID); err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to unlink provider", err.Error())
 		return
 	}
@@ -108,7 +108,7 @@ func (h *Handler) GetProviders(c *gin.Context) {
 	jwtToken := token.(jwt.Token)
 	username := jwtToken.Subject()
 
-	providers, err := h.auth.GetLinkedProviders(c.Request.Context(), username)
+	providers, err := h.providers.GetLinkedProviders(c.Request.Context(), username)
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "failed to get providers", err.Error())
 		return

@@ -28,7 +28,7 @@ func (h *Handler) SignUp(c *gin.Context) {
 		return
 	}
 
-	result, err := h.auth.SignUp(c.Request.Context(), req.Email, req.Password)
+	result, err := h.creds.SignUp(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		errorResponse(c, http.StatusBadRequest, "signup failed", err.Error())
 		return
@@ -59,7 +59,7 @@ func (h *Handler) ConfirmSignUp(c *gin.Context) {
 		return
 	}
 
-	if err := h.auth.ConfirmSignUp(c.Request.Context(), req.Email, req.Code); err != nil {
+	if err := h.creds.ConfirmSignUp(c.Request.Context(), req.Email, req.Code); err != nil {
 		errorResponse(c, http.StatusBadRequest, "confirmation failed", err.Error())
 		return
 	}
