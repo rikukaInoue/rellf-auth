@@ -6,15 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/inouetaishi/rellf-auth/internal/cognito"
 	"github.com/inouetaishi/rellf-auth/internal/config"
+	"github.com/inouetaishi/rellf-auth/internal/oidc"
+	"github.com/inouetaishi/rellf-auth/internal/usecase"
 )
 
 type Handler struct {
-	auth cognito.Service
-	cfg  *config.Config
+	auth    cognito.Service
+	authUC  *usecase.AuthUseCase
+	issuer  *oidc.TokenIssuer
+	cfg     *config.Config
 }
 
-func New(auth cognito.Service, cfg *config.Config) *Handler {
-	return &Handler{auth: auth, cfg: cfg}
+func New(auth cognito.Service, authUC *usecase.AuthUseCase, issuer *oidc.TokenIssuer, cfg *config.Config) *Handler {
+	return &Handler{auth: auth, authUC: authUC, issuer: issuer, cfg: cfg}
 }
 
 type ErrorResponse struct {

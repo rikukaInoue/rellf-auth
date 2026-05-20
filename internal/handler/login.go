@@ -28,11 +28,28 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	tokens, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	user, err := h.authUC.Authenticate(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		errorResponse(c, http.StatusUnauthorized, "login failed", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, tokens)
+	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{"pwd"})
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
+		return
+	}
+
+	accessToken, err := h.issuer.SignAccessToken(user.Sub, []string{"openid", "email", "profile"}, h.cfg.CognitoClientID)
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
+		return
+	}
+
+	c.JSON(http.StatusOK, AuthTokensResponse{
+		AccessToken: accessToken,
+		IDToken:     idToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   3600,
+	})
 }

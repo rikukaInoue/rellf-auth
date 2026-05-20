@@ -23,6 +23,7 @@ import (
 	"github.com/inouetaishi/rellf-auth/internal/middleware"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/router"
+	"github.com/inouetaishi/rellf-auth/internal/usecase"
 
 	_ "github.com/inouetaishi/rellf-auth/docs"
 )
@@ -64,7 +65,8 @@ func init() {
 
 	oidcH := oidc.NewOIDCHandler(cognitoClient, cognitoClient, tokenIssuer, authCodeCodec, clientRegistry, cfg)
 
-	h := handler.New(cognitoClient, cfg)
+	authUC := usecase.NewAuthUseCase(cognitoClient)
+	h := handler.New(cognitoClient, authUC, tokenIssuer, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, cognitoClient, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)
 	ginLambda = ginadapter.NewV2(r)
