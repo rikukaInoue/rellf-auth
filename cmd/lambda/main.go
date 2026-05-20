@@ -41,16 +41,13 @@ func init() {
 		log.Fatalf("failed to create cognito client: %v", err)
 	}
 
-	jwtMw, err := middleware.NewJWTMiddleware(cfg.AWSRegion, cfg.CognitoPoolID, cfg.CognitoClientID)
-	if err != nil {
-		log.Fatalf("failed to create JWT middleware: %v", err)
-	}
-
 	// OIDC Provider setup
 	tokenIssuer, err := oidc.NewTokenIssuer(cfg.OIDCSigningKey, cfg.OIDCKeyID, cfg.OIDCIssuer)
 	if err != nil {
 		log.Fatalf("failed to create token issuer: %v", err)
 	}
+
+	jwtMw := middleware.NewJWTMiddleware(tokenIssuer.JWKS(), cfg.OIDCIssuer, cfg.CognitoClientID)
 
 	authCodeCodec, err := oidc.NewAuthCodeCodec(cfg.OIDCAuthCodeKey)
 	if err != nil {

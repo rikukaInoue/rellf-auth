@@ -35,16 +35,6 @@ func main() {
 		log.Fatalf("failed to create cognito client: %v", err)
 	}
 
-	var jwtMw *middleware.JWTMiddleware
-	if cfg.IsLocal() {
-		jwtMw = middleware.NewLocalJWTMiddleware(cfg.CognitoClientID)
-	} else {
-		jwtMw, err = middleware.NewJWTMiddleware(cfg.AWSRegion, cfg.CognitoPoolID, cfg.CognitoClientID)
-		if err != nil {
-			log.Fatalf("failed to create JWT middleware: %v", err)
-		}
-	}
-
 	// OIDC Provider setup
 	var tokenIssuer *oidc.TokenIssuer
 	if cfg.OIDCSigningKey == "auto" {
@@ -70,6 +60,13 @@ func main() {
 		log.Fatalf("failed to parse OIDC clients: %v", err)
 	}
 	clientRegistry := oidc.NewClientRegistry(oidcClients)
+
+	var jwtMw *middleware.JWTMiddleware
+	if cfg.IsLocal() {
+		jwtMw = middleware.NewLocalJWTMiddleware(tokenIssuer.JWKS(), cfg.OIDCIssuer, cfg.CognitoClientID)
+	} else {
+		jwtMw = middleware.NewJWTMiddleware(tokenIssuer.JWKS(), cfg.OIDCIssuer, cfg.CognitoClientID)
+	}
 
 	authUC := usecase.NewAuthUseCase(cognitoClient)
 	userUC := usecase.NewUserUseCase(cognitoClient)

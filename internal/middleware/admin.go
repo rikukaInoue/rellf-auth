@@ -18,20 +18,11 @@ func (m *JWTMiddleware) VerifyAdminCookie() gin.HandlerFunc {
 			return
 		}
 
-		var token jwt.Token
-
-		if m.local {
-			token, err = jwt.Parse([]byte(tokenString),
-				jwt.WithVerify(false),
-				jwt.WithValidate(true),
-			)
-		} else {
-			token, err = jwt.Parse([]byte(tokenString),
-				jwt.WithKeySet(m.keySet),
-				jwt.WithValidate(true),
-				jwt.WithIssuer(m.issuer),
-			)
-		}
+		token, err := jwt.Parse([]byte(tokenString),
+			jwt.WithKeySet(m.keySet),
+			jwt.WithValidate(true),
+			jwt.WithIssuer(m.issuer),
+		)
 
 		if err != nil {
 			secure := !m.local
@@ -42,15 +33,12 @@ func (m *JWTMiddleware) VerifyAdminCookie() gin.HandlerFunc {
 			return
 		}
 
-		// Check cognito:groups for "admin"
-		// In local mode, floci may not include groups in tokens, so skip the check
-		if !m.local {
-			groupsRaw, ok := token.Get("cognito:groups")
-			if !ok || !containsAdmin(groupsRaw) {
-				c.Redirect(http.StatusFound, "/admin/login")
-				c.Abort()
-				return
-			}
+		// Check "groups" claim for "admin" (self-issued tokens use "groups", not "cognito:groups")
+		groupsRaw, ok := token.Get("groups")
+		if !ok || !containsAdmin(groupsRaw) {
+			c.Redirect(http.StatusFound, "/admin/login")
+			c.Abort()
+			return
 		}
 
 		c.Set("admin_user", token.Subject())

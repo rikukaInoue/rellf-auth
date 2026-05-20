@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -16,38 +14,22 @@ type JWTMiddleware struct {
 	keySet   jwk.Set
 	issuer   string
 	clientID string
-	cache    *jwk.Cache
 	local    bool
 }
 
-func NewJWTMiddleware(region, poolID, clientID string) (*JWTMiddleware, error) {
-	issuer := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", region, poolID)
-	jwksURL := issuer + "/.well-known/jwks.json"
-
-	cache := jwk.NewCache(context.Background())
-	if err := cache.Register(jwksURL); err != nil {
-		return nil, fmt.Errorf("failed to register JWKS URL: %w", err)
-	}
-
-	// Perform initial fetch
-	keySet, err := cache.Get(context.Background(), jwksURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
-	}
-
+func NewJWTMiddleware(keySet jwk.Set, issuer, clientID string) *JWTMiddleware {
 	return &JWTMiddleware{
 		keySet:   keySet,
 		issuer:   issuer,
 		clientID: clientID,
-		cache:    cache,
-	}, nil
+	}
 }
 
-// NewLocalJWTMiddleware creates a JWT middleware for local development (floci/LocalStack).
-// It parses tokens without signature verification since local emulators may not provide valid JWKS.
-func NewLocalJWTMiddleware(clientID string) *JWTMiddleware {
-	log.Println("WARNING: JWT middleware running in local mode - signature verification disabled")
+func NewLocalJWTMiddleware(keySet jwk.Set, issuer, clientID string) *JWTMiddleware {
+	log.Println("WARNING: JWT middleware running in local mode - relaxed validation")
 	return &JWTMiddleware{
+		keySet:   keySet,
+		issuer:   issuer,
 		clientID: clientID,
 		local:    true,
 	}
@@ -69,36 +51,23 @@ func (m *JWTMiddleware) Verify() gin.HandlerFunc {
 
 		tokenString := parts[1]
 
-		var token jwt.Token
-		var err error
-
-		if m.local {
-			// Local mode: parse without signature verification
-			token, err = jwt.Parse([]byte(tokenString),
-				jwt.WithVerify(false),
-				jwt.WithValidate(true),
-			)
-		} else {
-			token, err = jwt.Parse([]byte(tokenString),
-				jwt.WithKeySet(m.keySet),
-				jwt.WithValidate(true),
-				jwt.WithIssuer(m.issuer),
-			)
-		}
+		token, err := jwt.Parse([]byte(tokenString),
+			jwt.WithKeySet(m.keySet),
+			jwt.WithValidate(true),
+			jwt.WithIssuer(m.issuer),
+		)
 
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "invalid token", "detail": err.Error()})
 			return
 		}
 
-		// Verify token_use claim
 		tokenUse, ok := token.Get("token_use")
 		if !ok || (tokenUse != "access" && tokenUse != "id") {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "invalid token_use claim"})
 			return
 		}
 
-		// For ID tokens, verify audience matches client ID
 		if tokenUse == "id" {
 			audiences := token.Audience()
 			found := false
@@ -114,7 +83,6 @@ func (m *JWTMiddleware) Verify() gin.HandlerFunc {
 			}
 		}
 
-		// Set claims in context
 		c.Set("user_sub", token.Subject())
 		c.Set("token_claims", token)
 
