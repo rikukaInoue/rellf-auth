@@ -50,6 +50,6 @@ func (h *Handler) Login(c *gin.Context) {
 		AccessToken: accessToken,
 		IDToken:     idToken,
 		TokenType:   "Bearer",
-		ExpiresIn:   3600,
+		ExpiresIn:   900,
 	})
 }

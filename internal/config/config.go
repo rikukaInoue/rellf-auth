@@ -24,8 +24,9 @@ type Config struct {
 	OIDCIssuer      string `envconfig:"OIDC_ISSUER" required:"true"`
 	OIDCSigningKey  string `envconfig:"OIDC_SIGNING_KEY" required:"true"`  // RSA PEM or "auto" for local
 	OIDCKeyID       string `envconfig:"OIDC_KEY_ID" required:"true"`
-	OIDCAuthCodeKey string `envconfig:"OIDC_AUTH_CODE_KEY" required:"true"` // AES-256 hex (64 chars)
-	OIDCClients     string `envconfig:"OIDC_CLIENTS" required:"true"`      // client definitions
+	OIDCAuthCodeKey      string `envconfig:"OIDC_AUTH_CODE_KEY" required:"true"`      // AES-256 hex (64 chars)
+	OIDCRefreshTokenKey  string `envconfig:"OIDC_REFRESH_TOKEN_KEY" required:"true"` // AES-256 hex (64 chars)
+	OIDCClients          string `envconfig:"OIDC_CLIENTS" required:"true"`           // client definitions
 
 	// CORS
 	CORSOrigins string `envconfig:"CORS_ORIGINS"` // comma-separated allowed origins
@@ -66,6 +67,7 @@ func resolveSSMValues(cfg *Config) error {
 		&cfg.CognitoClientSecret,
 		&cfg.OIDCSigningKey,
 		&cfg.OIDCAuthCodeKey,
+		&cfg.OIDCRefreshTokenKey,
 	}
 
 	// Collect SSM paths

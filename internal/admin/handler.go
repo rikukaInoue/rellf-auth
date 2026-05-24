@@ -61,7 +61,7 @@ func (h *AdminHandler) LoginSubmit(c *gin.Context) {
 
 	secure := !h.cfg.IsLocal()
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("admin_token", idToken, 3600, "/admin", "", secure, true)
+	c.SetCookie("admin_token", idToken, 900, "/admin", "", secure, true)
 	c.Redirect(http.StatusSeeOther, "/admin/users")
 }
 

@@ -20,14 +20,15 @@ import (
 
 // OIDCHandler handles all OIDC Provider endpoints.
 type OIDCHandler struct {
-	authUC    *usecase.AuthUseCase
-	userUC    *usecase.UserUseCase
-	issuer    *TokenIssuer
-	codec     *AuthCodeCodec
-	clients   *ClientRegistry
-	cfg       *config.Config
-	templates *template.Template
-	staticFS  fs.FS
+	authUC       *usecase.AuthUseCase
+	userUC       *usecase.UserUseCase
+	issuer       *TokenIssuer
+	codec        *AuthCodeCodec
+	refreshCodec *RefreshTokenCodec
+	clients      *ClientRegistry
+	cfg          *config.Config
+	templates    *template.Template
+	staticFS     fs.FS
 }
 
 // NewOIDCHandler creates a new OIDCHandler.
@@ -36,18 +37,20 @@ func NewOIDCHandler(
 	userUC *usecase.UserUseCase,
 	issuer *TokenIssuer,
 	codec *AuthCodeCodec,
+	refreshCodec *RefreshTokenCodec,
 	clients *ClientRegistry,
 	cfg *config.Config,
 ) *OIDCHandler {
 	return &OIDCHandler{
-		authUC:    authUC,
-		userUC:    userUC,
-		issuer:    issuer,
-		codec:     codec,
-		clients:   clients,
-		cfg:       cfg,
-		templates: parseTemplates(),
-		staticFS:  staticSubFS(),
+		authUC:       authUC,
+		userUC:       userUC,
+		issuer:       issuer,
+		codec:        codec,
+		refreshCodec: refreshCodec,
+		clients:      clients,
+		cfg:          cfg,
+		templates:    parseTemplates(),
+		staticFS:     staticSubFS(),
 	}
 }
 
@@ -66,7 +69,7 @@ func (h *OIDCHandler) Discovery(c *gin.Context) {
 		"userinfo_endpoint":      iss + "/oidc/userinfo",
 		"jwks_uri":               iss + "/oidc/jwks.json",
 		"response_types_supported": []string{"code"},
-		"grant_types_supported":    []string{"authorization_code"},
+		"grant_types_supported":    []string{"authorization_code", "refresh_token"},
 		"subject_types_supported":  []string{"public"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":        []string{"openid", "email", "profile"},
@@ -318,28 +321,31 @@ func (h *OIDCHandler) issueCodeAndRedirect(c *gin.Context, sub, email string, gr
 	c.Redirect(http.StatusFound, redirect)
 }
 
-// Token exchanges an authorization code for tokens (POST /oidc/token).
+// Token exchanges an authorization code or refresh token for tokens (POST /oidc/token).
 func (h *OIDCHandler) Token(c *gin.Context) {
-	grantType := c.PostForm("grant_type")
-	if grantType != "authorization_code" {
+	switch c.PostForm("grant_type") {
+	case "authorization_code":
+		h.handleAuthorizationCodeGrant(c)
+	case "refresh_token":
+		h.handleRefreshTokenGrant(c)
+	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported_grant_type"})
-		return
 	}
+}
 
+func (h *OIDCHandler) handleAuthorizationCodeGrant(c *gin.Context) {
 	code := c.PostForm("code")
 	redirectURI := c.PostForm("redirect_uri")
 	clientID := c.PostForm("client_id")
 	clientSecret := c.PostForm("client_secret")
 	codeVerifier := c.PostForm("code_verifier")
 
-	// Decode authorization code
 	payload, err := h.codec.Decode(code)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "invalid or expired authorization code"})
 		return
 	}
 
-	// Validate client
 	if payload.ClientID != clientID {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "client_id mismatch"})
 		return
@@ -351,13 +357,11 @@ func (h *OIDCHandler) Token(c *gin.Context) {
 		return
 	}
 
-	// Validate redirect_uri
 	if payload.RedirectURI != redirectURI {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "redirect_uri mismatch"})
 		return
 	}
 
-	// PKCE verification
 	if payload.CodeChallenge != "" {
 		if codeVerifier == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "code_verifier required"})
@@ -368,29 +372,67 @@ func (h *OIDCHandler) Token(c *gin.Context) {
 			return
 		}
 	} else if client.IsPublic() {
-		// Public clients must use PKCE
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "error_description": "public clients must use PKCE"})
 		return
 	}
 
-	// Sign tokens
-	idToken, err := h.issuer.SignIDToken(payload.Sub, payload.Email, payload.Groups, clientID, payload.Nonce, payload.AuthTime, payload.AMR)
+	h.issueTokens(c, payload.Sub, payload.Email, payload.Groups, clientID, payload.Scopes, payload.Nonce, payload.AuthTime, payload.AMR)
+}
+
+func (h *OIDCHandler) handleRefreshTokenGrant(c *gin.Context) {
+	refreshToken := c.PostForm("refresh_token")
+	clientID := c.PostForm("client_id")
+	clientSecret := c.PostForm("client_secret")
+
+	if refreshToken == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "error_description": "missing refresh_token"})
+		return
+	}
+
+	payload, err := h.refreshCodec.Decode(refreshToken)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "invalid or expired refresh token"})
+		return
+	}
+
+	if payload.ClientID != clientID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_grant", "error_description": "client_id mismatch"})
+		return
+	}
+
+	if _, err := h.clients.ValidateSecret(clientID, clientSecret); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_client", "error_description": err.Error()})
+		return
+	}
+
+	h.issueTokens(c, payload.Sub, payload.Email, payload.Groups, clientID, payload.Scopes, "", 0, nil)
+}
+
+func (h *OIDCHandler) issueTokens(c *gin.Context, sub, email string, groups []string, clientID string, scopes []string, nonce string, authTime int64, amr []string) {
+	idToken, err := h.issuer.SignIDToken(sub, email, groups, clientID, nonce, authTime, amr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
 		return
 	}
 
-	accessToken, err := h.issuer.SignAccessToken(payload.Sub, payload.Scopes, clientID)
+	accessToken, err := h.issuer.SignAccessToken(sub, scopes, clientID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
+		return
+	}
+
+	refreshToken, err := h.refreshCodec.Issue(sub, email, groups, clientID, scopes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"access_token": accessToken,
-		"id_token":     idToken,
-		"token_type":   "Bearer",
-		"expires_in":   3600,
+		"access_token":  accessToken,
+		"id_token":      idToken,
+		"refresh_token": refreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    900,
 	})
 }
 

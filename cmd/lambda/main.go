@@ -54,6 +54,11 @@ func init() {
 		log.Fatalf("failed to create auth code codec: %v", err)
 	}
 
+	refreshCodec, err := oidc.NewRefreshTokenCodec(cfg.OIDCRefreshTokenKey)
+	if err != nil {
+		log.Fatalf("failed to create refresh token codec: %v", err)
+	}
+
 	oidcClients, err := oidc.ParseClients(cfg.OIDCClients)
 	if err != nil {
 		log.Fatalf("failed to parse OIDC clients: %v", err)
@@ -62,7 +67,7 @@ func init() {
 
 	authUC := usecase.NewAuthUseCase(cognitoClient)
 	userUC := usecase.NewUserUseCase(cognitoClient)
-	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, clientRegistry, cfg)
+	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, refreshCodec, clientRegistry, cfg)
 	h := handler.New(cognitoClient, cognitoClient, authUC, tokenIssuer, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)

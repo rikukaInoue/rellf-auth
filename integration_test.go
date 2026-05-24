@@ -47,6 +47,11 @@ func setupTestServer(t *testing.T) *httptest.Server {
 		t.Fatalf("failed to create auth code codec: %v", err)
 	}
 
+	refreshCodec, err := oidc.NewRefreshTokenCodec(cfg.OIDCRefreshTokenKey)
+	if err != nil {
+		t.Fatalf("failed to create refresh token codec: %v", err)
+	}
+
 	oidcClients, err := oidc.ParseClients(cfg.OIDCClients)
 	if err != nil {
 		t.Fatalf("failed to parse OIDC clients: %v", err)
@@ -55,7 +60,7 @@ func setupTestServer(t *testing.T) *httptest.Server {
 
 	authUC := usecase.NewAuthUseCase(cognitoClient)
 	userUC := usecase.NewUserUseCase(cognitoClient)
-	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, clientRegistry, cfg)
+	oidcH := oidc.NewOIDCHandler(authUC, userUC, tokenIssuer, authCodeCodec, refreshCodec, clientRegistry, cfg)
 	h := handler.New(cognitoClient, cognitoClient, authUC, tokenIssuer, cfg)
 	adminH := admin.NewAdminHandler(cognitoClient, authUC, tokenIssuer, cfg)
 	r := router.Setup(h, adminH, oidcH, jwtMw, cfg)

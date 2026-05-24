@@ -42,6 +42,7 @@ OIDC_ISSUER=http://localhost:8080
 OIDC_SIGNING_KEY=auto
 OIDC_KEY_ID=local-key-1
 OIDC_AUTH_CODE_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+OIDC_REFRESH_TOKEN_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 OIDC_CLIENTS=test-client::public:http://localhost:3000/callback,meeting-companion::public:http://localhost:3456/callback
 ENVEOF
 

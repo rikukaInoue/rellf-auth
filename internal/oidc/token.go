@@ -104,7 +104,7 @@ func (ti *TokenIssuer) SignIDToken(sub, email string, groups []string, aud, nonc
 		Subject(sub).
 		Audience([]string{aud}).
 		IssuedAt(now).
-		Expiration(now.Add(1 * time.Hour)).
+		Expiration(now.Add(15 * time.Minute)).
 		Claim("email", email).
 		Claim("email_verified", true)
 
@@ -143,7 +143,7 @@ func (ti *TokenIssuer) SignAccessToken(sub string, scopes []string, aud string) 
 		Subject(sub).
 		Audience([]string{aud}).
 		IssuedAt(now).
-		Expiration(now.Add(1 * time.Hour)).
+		Expiration(now.Add(15 * time.Minute)).
 		Claim("scope", scopes).
 		Claim("token_use", "access").
 		Build()
