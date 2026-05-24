@@ -9,17 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 
-type AdminService interface {
-	AdminListUsers(ctx context.Context, filter string, limit int32, paginationToken *string) (*AdminListUsersOutput, error)
-	AdminGetUser(ctx context.Context, username string) (*AdminUserDetail, error)
-	AdminCreateUser(ctx context.Context, email, tempPassword string) (*AdminUserDetail, error)
-	AdminConfirmSignUp(ctx context.Context, username string) error
-	AdminResetPassword(ctx context.Context, username string) error
-	AdminDisableUser(ctx context.Context, username string) error
-	AdminEnableUser(ctx context.Context, username string) error
-	AdminDeleteUser(ctx context.Context, username string) error
-}
-
 type AdminUserSummary struct {
 	Username   string    `json:"username"`
 	Email      string    `json:"email"`

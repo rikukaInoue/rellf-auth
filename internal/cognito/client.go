@@ -25,17 +25,6 @@ type AuthTokens struct {
 	TokenType    string `json:"token_type"`
 }
 
-type Service interface {
-	SignUp(ctx context.Context, email, password string) (*domain.SignUpResult, error)
-	ConfirmSignUp(ctx context.Context, email, code string) error
-	Login(ctx context.Context, email, password string) (*AuthTokens, error)
-	ForgotPassword(ctx context.Context, email string) error
-	ConfirmForgotPassword(ctx context.Context, email, code, newPassword string) error
-	LinkProvider(ctx context.Context, username, providerName, providerUID string) error
-	UnlinkProvider(ctx context.Context, username, providerName, providerUID string) error
-	GetLinkedProviders(ctx context.Context, username string) ([]domain.LinkedProvider, error)
-}
-
 type Client struct {
 	cip          *cip.Client
 	poolID       string

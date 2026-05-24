@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 )
 
 type LoginRequest struct {
@@ -34,7 +35,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{"pwd"})
+	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{domain.AMRPassword})
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
 		return

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -51,18 +52,18 @@ func containsAdmin(groupsRaw interface{}) bool {
 	switch groups := groupsRaw.(type) {
 	case []interface{}:
 		for _, g := range groups {
-			if s, ok := g.(string); ok && s == "admin" {
+			if s, ok := g.(string); ok && s == domain.GroupAdmin {
 				return true
 			}
 		}
 	case []string:
 		for _, g := range groups {
-			if g == "admin" {
+			if g == domain.GroupAdmin {
 				return true
 			}
 		}
 	case string:
-		return groups == "admin"
+		return groups == domain.GroupAdmin
 	}
 	return false
 }

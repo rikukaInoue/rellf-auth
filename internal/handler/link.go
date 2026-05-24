@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -25,15 +24,7 @@ func (h *Handler) LinkGoogle(c *gin.Context) {
 
 	state := "link:" + username
 
-	authURL := fmt.Sprintf(
-		"https://%s/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=openid+email+profile&identity_provider=Google",
-		h.cfg.CognitoDomain,
-		h.cfg.CognitoClientID,
-		url.QueryEscape(h.cfg.OAuthCallbackURL),
-		url.QueryEscape(state),
-	)
-
-	c.JSON(http.StatusOK, gin.H{"redirect_url": authURL})
+	c.JSON(http.StatusOK, gin.H{"redirect_url": h.googleAuthURL(state)})
 }
 
 // UnlinkProvider godoc

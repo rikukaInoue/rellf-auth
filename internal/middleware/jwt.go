@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -63,12 +64,12 @@ func (m *JWTMiddleware) Verify() gin.HandlerFunc {
 		}
 
 		tokenUse, ok := token.Get("token_use")
-		if !ok || (tokenUse != "access" && tokenUse != "id") {
+		if !ok || (tokenUse != domain.TokenUseAccess && tokenUse != domain.TokenUseID) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"message": "invalid token_use claim"})
 			return
 		}
 
-		if tokenUse == "id" {
+		if tokenUse == domain.TokenUseID {
 			audiences := token.Audience()
 			found := false
 			for _, aud := range audiences {

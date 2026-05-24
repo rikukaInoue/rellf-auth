@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -145,7 +146,7 @@ func (ti *TokenIssuer) SignAccessToken(sub string, scopes []string, aud string) 
 		IssuedAt(now).
 		Expiration(now.Add(15 * time.Minute)).
 		Claim("scope", scopes).
-		Claim("token_use", "access").
+		Claim("token_use", domain.TokenUseAccess).
 		Build()
 	if err != nil {
 		return "", fmt.Errorf("failed to build access token: %w", err)

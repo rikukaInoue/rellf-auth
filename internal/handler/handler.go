@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/inouetaishi/rellf-auth/internal/config"
@@ -55,6 +57,16 @@ type ProvidersResponse struct {
 // MessageResponse is a generic success message.
 type MessageResponse struct {
 	Message string `json:"message" example:"success"`
+}
+
+func (h *Handler) googleAuthURL(state string) string {
+	return fmt.Sprintf(
+		"https://%s/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=openid+email+profile&identity_provider=Google",
+		h.cfg.CognitoDomain,
+		h.cfg.CognitoClientID,
+		url.QueryEscape(h.cfg.OAuthCallbackURL),
+		url.QueryEscape(state),
+	)
 }
 
 func errorResponse(c *gin.Context, status int, msg string, detail string) {
