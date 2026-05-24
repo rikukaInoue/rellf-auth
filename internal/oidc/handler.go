@@ -69,7 +69,7 @@ func (h *OIDCHandler) Discovery(c *gin.Context) {
 		"userinfo_endpoint":      iss + "/oidc/userinfo",
 		"jwks_uri":               iss + "/oidc/jwks.json",
 		"response_types_supported": []string{"code"},
-		"grant_types_supported":    []string{"authorization_code", "refresh_token"},
+		"grant_types_supported":    []string{"authorization_code", "refresh_token", "client_credentials"},
 		"subject_types_supported":  []string{"public"},
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"scopes_supported":        []string{"openid", "email", "profile"},
@@ -328,6 +328,8 @@ func (h *OIDCHandler) Token(c *gin.Context) {
 		h.handleAuthorizationCodeGrant(c)
 	case "refresh_token":
 		h.handleRefreshTokenGrant(c)
+	case "client_credentials":
+		h.handleClientCredentialsGrant(c)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported_grant_type"})
 	}
@@ -406,6 +408,40 @@ func (h *OIDCHandler) handleRefreshTokenGrant(c *gin.Context) {
 	}
 
 	h.issueTokens(c, payload.Sub, payload.Email, payload.Groups, clientID, payload.Scopes, "", 0, nil)
+}
+
+func (h *OIDCHandler) handleClientCredentialsGrant(c *gin.Context) {
+	clientID := c.PostForm("client_id")
+	clientSecret := c.PostForm("client_secret")
+	scope := c.PostForm("scope")
+
+	client, err := h.clients.ValidateSecret(clientID, clientSecret)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_client", "error_description": err.Error()})
+		return
+	}
+
+	if client.IsPublic() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unauthorized_client", "error_description": "public clients cannot use client_credentials"})
+		return
+	}
+
+	var scopes []string
+	if scope != "" {
+		scopes = strings.Split(scope, " ")
+	}
+
+	accessToken, err := h.issuer.SignAccessToken(clientID, scopes, clientID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server_error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   900,
+	})
 }
 
 func (h *OIDCHandler) issueTokens(c *gin.Context, sub, email string, groups []string, clientID string, scopes []string, nonce string, authTime int64, amr []string) {
