@@ -277,7 +277,7 @@ func toDomainUser(d *UserDetail) domain.User {
 func summaryToDomainUser(s UserSummary) domain.User {
 	status := mapStatus(s.Status, s.Enabled)
 
-	u, _ := domain.FromStore(
+	u, err := domain.FromStore(
 		s.Username,
 		s.Email,
 		string(status),
@@ -286,6 +286,13 @@ func summaryToDomainUser(s UserSummary) domain.User {
 		nil,
 		"",
 	)
+	if err != nil {
+		return &domain.PendingUser{
+			ID:        s.Username,
+			Email:     s.Email,
+			CreatedAt: s.CreatedAt,
+		}
+	}
 	return u
 }
 

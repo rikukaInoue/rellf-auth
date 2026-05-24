@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
@@ -35,15 +37,7 @@ func (h *Handler) OAuthGoogle(c *gin.Context) {
 		return
 	}
 
-	authURL := fmt.Sprintf(
-		"https://%s/oauth2/authorize?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=openid+email+profile&identity_provider=Google",
-		h.cfg.CognitoDomain,
-		h.cfg.CognitoClientID,
-		url.QueryEscape(h.cfg.OAuthCallbackURL),
-		url.QueryEscape(state),
-	)
-
-	c.Redirect(http.StatusFound, authURL)
+	c.Redirect(http.StatusFound, h.googleAuthURL(state))
 }
 
 // OAuthCallback godoc
@@ -97,7 +91,7 @@ func (h *Handler) OAuthCallback(c *gin.Context) {
 		}
 	}
 
-	selfIDToken, err := h.issuer.SignIDToken(sub, email, groups, h.cfg.CognitoClientID, "", 0, []string{"federated"})
+	selfIDToken, err := h.issuer.SignIDToken(sub, email, groups, h.cfg.CognitoClientID, "", 0, []string{domain.AMRFederated})
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "token signing failed", err.Error())
 		return
@@ -128,7 +122,15 @@ func (h *Handler) exchangeCognitoCode(c *gin.Context, code string) (string, erro
 	data.Set("code", code)
 	data.Set("redirect_uri", h.cfg.OAuthCallbackURL)
 
-	resp, err := http.Post(tokenURL, "application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		errorResponse(c, http.StatusInternalServerError, "failed to create request", err.Error())
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		errorResponse(c, http.StatusInternalServerError, "token exchange failed", err.Error())
 		return "", err

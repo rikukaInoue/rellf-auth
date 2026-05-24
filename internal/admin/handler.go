@@ -4,8 +4,10 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/inouetaishi/rellf-auth/internal/domain"
 	"github.com/inouetaishi/rellf-auth/internal/config"
 	"github.com/inouetaishi/rellf-auth/internal/oidc"
 	"github.com/inouetaishi/rellf-auth/internal/usecase"
@@ -53,7 +55,7 @@ func (h *AdminHandler) LoginSubmit(c *gin.Context) {
 		return
 	}
 
-	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{"pwd"})
+	idToken, err := h.issuer.SignIDToken(user.Sub, user.Email, user.Groups, h.cfg.CognitoClientID, "", 0, []string{domain.AMRPassword})
 	if err != nil {
 		h.templates.ExecuteTemplate(c.Writer, "login", gin.H{"Error": "Token signing failed"})
 		return
@@ -80,7 +82,8 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 
 	filter := ""
 	if search != "" {
-		filter = `email ^= "` + search + `"`
+		sanitized := strings.ReplaceAll(search, `"`, "")
+		filter = `email ^= "` + sanitized + `"`
 	}
 
 	var paginationToken *string
